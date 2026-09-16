@@ -23,40 +23,27 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
         yield event.plain_result(f"Hello, {user_name}, 你发了 {message_str}!") # 发送一条纯文本消息
     
     @filter.command("留言")
-    async def send(self, event: AstrMessageEvent):
-        """这是一个哔哩哔哩留言指令，可以把 QQ 消息转化为弹幕发送到某个 b 站 up 主的直播间中"""
+    async def send(self, event: AstrMessageEvent, msg: str = ""):
+        """指令：/留言 内容"""
         user_name = event.get_sender_name()
-        message_str = event.message_str
-        message_chain = event.get_messages()
-        logger.info(message_chain)
-        
-        cmd_prefix = "/留言"
-        content = message_str.strip()
-        if content.startswith(cmd_prefix):
-            content = content[len(cmd_prefix):].strip()
-        
-        if not content:
+        if not msg.strip():
             yield event.plain_result("❌ 啊啊啊留言内容不能为空哇！用法：/留言 你想说的话的说（认真）")
             return
 
-        # 昵称裁剪，最多5字符
+        # 昵称裁剪最多5字符
         short_name = user_name[:5]
-        # 【昵称】留言：用户输入内容，插件在这里一次性组装完整弹幕
-        full_danmaku = f"【{short_name}】留言：{content}"
+        # 插件在这里组装完整弹幕
+        full_danmaku = f"【{short_name}】留言：{msg.strip()}"
+        rune_cnt = count_rune(full_danmaku)
 
-        # 字符校验（中文符号都算1个字符）
-        # 注意：python len是字节，需要按rune统计，模拟utf8字符计数
-        rune_count = len(full_danmaku)
-        if rune_count > self.max_danmaku_len:
+        if rune_cnt > self.max_danmaku_len:
             yield event.plain_result(
-                f"❌ 留言过长！\n完整弹幕预览：{full_danmaku}\n最大允许{self.max_danmaku_len}字符，当前{rune_count}字符"
+                f"❌ 留言过长！\n完整弹幕预览：{full_danmaku}\n最大允许{self.max_danmaku_len}字符，当前{rune_cnt}字符"
             )
             return
 
         try:
-            # Go现在只读取msg，sender参数保留占位，不会使用
             params = {
-                "sender": "",
                 "msg": full_danmaku
             }
             async with aiohttp.ClientSession() as session:
@@ -66,7 +53,8 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as resp:
                     resp_text = await resp.text()
-                    yield event.plain_result(f"✅ 留言弹幕已提交")
+                    logger.info(f"Go返回：{resp_text}")
+                    yield event.plain_result(f"✅ 留言弹幕已提交，预览：{full_danmaku}")
         except aiohttp.ClientConnectionError:
             yield event.plain_result("❌ 无法连接弹幕后端，请检查 Go 服务是否启动，确认 172.18.167.28:8023 网络连通")
         except aiohttp.ClientError:
