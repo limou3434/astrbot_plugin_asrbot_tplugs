@@ -38,19 +38,31 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
         if not content:
             yield event.plain_result("❌ 留言内容不能为空！用法：/留言 你想说的话")
             return
-        # 限制【留言本体】最多25字符
-        max_msg_len = 25
-        if len(content) > max_msg_len:
+
+        # 昵称裁剪：超过5字自动截断为前5个字
+        short_name = user_name[:5]
+        max_total = 35  # 【昵称】留言整体总字符上限35
+        bracket_len = 2 # 【】两个符号
+        short_name_len = len(short_name)
+        used_len = short_name_len + bracket_len
+        remain_for_msg = max_total - used_len
+
+        if remain_for_msg <= 0:
+            yield event.plain_result(f"❌ 昵称裁剪后【{short_name}】空间不足，无法附加留言发送弹幕")
+            return
+
+        if len(content) > remain_for_msg:
             yield event.plain_result(
-                f"❌ 留言内容过长！\n你输入：{content}\n当前长度{len(content)}，留言最多允许{max_msg_len}字符。"
+                f"❌ 留言过长！\n昵称已自动裁剪为【{short_name}】，剩余可写{remain_for_msg}字符\n当前留言长度：{len(content)}"
             )
             return
-        # 预拼接完整弹幕文本（【昵称】+留言），Go侧还会校验总长度上限30
-        full_text = f"【{user_name}】{content}"
-        # 异步HTTP请求，使用aiohttp，符合AstrBot规范
+
+        # 拼接最终弹幕文本
+        full_text = f"【{short_name}】{content}"
+        # 传给Go接口的sender使用裁剪后的昵称
         try:
             params = {
-                "sender": user_name,
+                "sender": short_name,
                 "msg": content
             }
             async with aiohttp.ClientSession() as session:
