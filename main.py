@@ -24,14 +24,12 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
     
     @filter.command("留言")
     async def send(self, event: AstrMessageEvent):
-        """这是一个哔哩哔哩留言指令，可以把 QQ 消息转化为弹幕发送到某个 b 站 up 主的直播间中""" # 这是 handler 的描述，将会被解析方便用户了解插件内容。建议填写。
-        # 获取发送者的一些信息
-        user_name = event.get_sender_name() # 获取发送者 QQ 昵称
-        message_str = event.message_str # 用户发的纯文本消息字符串
-        message_chain = event.get_messages() # 用户所发的消息的消息链 from astrbot.api.message_components import *
+        """这是一个哔哩哔哩留言指令，可以把 QQ 消息转化为弹幕发送到某个 b 站 up 主的直播间中"""
+        user_name = event.get_sender_name()
+        message_str = event.message_str
+        message_chain = event.get_messages()
         logger.info(message_chain)
         
-        # 移除指令前缀 "/留言"，拿到真正用户留言内容
         cmd_prefix = "/留言"
         content = message_str.strip()
         if content.startswith(cmd_prefix):
@@ -40,31 +38,26 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
         if not content:
             yield event.plain_result("❌ 啊啊啊留言内容不能为空哇！用法：/留言 你想说的话的说（认真）")
             return
-        # 昵称裁剪：超过 5 字自动截断为前 5 个字符
+
+        # 昵称裁剪，最多5字符
         short_name = user_name[:5]
-        max_total_char = 35  # 整体弹幕最多 35 字符，和 Go 保持一致
-        bracket_len = 2 # 【】两个符号，各算 1 字符
-        short_name_len = len(short_name)
-        # 整体弹幕格式：【short_name】留言：content
-        fixed_text = "留言："
-        fixed_len = len(fixed_text)
-        used_len = short_name_len + bracket_len + fixed_len
-        remain_for_msg = max_total_char - used_len
-        if remain_for_msg <= 0:
-            yield event.plain_result(f"❌ 昵称裁剪后【{short_name}】空间不足，无法附加留言发送弹幕")
-            return
-        if len(content) > remain_for_msg:
+        # 【昵称】留言：用户输入内容，插件在这里一次性组装完整弹幕
+        full_danmaku = f"【{short_name}】留言：{content}"
+
+        # 字符校验（中文符号都算1个字符）
+        # 注意：python len是字节，需要按rune统计，模拟utf8字符计数
+        rune_count = len(full_danmaku)
+        if rune_count > self.max_danmaku_len:
             yield event.plain_result(
-                f"❌ 留言过长！\n昵称已自动裁剪为【{short_name}】，剩余可写{remain_for_msg}字符\n当前留言长度：{len(content)}"
+                f"❌ 留言过长！\n完整弹幕预览：{full_danmaku}\n最大允许{self.max_danmaku_len}字符，当前{rune_count}字符"
             )
             return
-        # 最终完整弹幕文本（仅用于逻辑校验，不传给Go！）
-        full_text = f"【{short_name}】{fixed_text}{content}"
-        # 传给Go接口：sender=昵称，msg=固定前缀+用户内容
+
         try:
+            # Go现在只读取msg，sender参数保留占位，不会使用
             params = {
-                "sender": short_name,
-                "msg": f"{fixed_text}{content}"
+                "sender": "",
+                "msg": full_danmaku
             }
             async with aiohttp.ClientSession() as session:
                 async with session.get(
@@ -81,7 +74,6 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
         except TimeoutError:
             yield event.plain_result("❌ 请求超时，Go 服务响应超时")
         except Exception as e:
-            # 兜底捕获，避免插件崩溃
             yield event.plain_result(f"❌ 未知错误：{str(e)}")
 
     async def terminate(self):
