@@ -58,7 +58,7 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
                 ) as resp:
                     resp_text = await resp.text()
                     logger.info(f"Go返回：{resp_text}")
-                    yield event.plain_result(f"✅ 留言弹幕已提交，预览：{full_danmaku}")
+                    yield event.plain_result(f"✅ 留言弹幕已提交到直播间")
         except aiohttp.ClientConnectionError:
             yield event.plain_result("❌ 无法连接弹幕后端，请检查 Go 服务是否启动，确认 172.18.167.28:8023 网络连通")
         except aiohttp.ClientError:
