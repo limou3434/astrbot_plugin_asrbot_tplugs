@@ -39,13 +39,13 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
             yield event.plain_result("❌ 留言内容不能为空！用法：/留言 你想说的话")
             return
 
-        # 昵称裁剪：超过5字自动截断为前5个字
+        # 昵称裁剪：超过5字自动截断为前5个字符
         short_name = user_name[:5]
-        max_total = 35  # 【昵称】留言整体总字符上限35
-        bracket_len = 2 # 【】两个符号
+        max_total_char = 35  # 整体弹幕最多35字符，和Go保持一致
+        bracket_len = 2 # 【】两个符号，各算1字符
         short_name_len = len(short_name)
         used_len = short_name_len + bracket_len
-        remain_for_msg = max_total - used_len
+        remain_for_msg = max_total_char - used_len
 
         if remain_for_msg <= 0:
             yield event.plain_result(f"❌ 昵称裁剪后【{short_name}】空间不足，无法附加留言发送弹幕")
