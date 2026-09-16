@@ -3,12 +3,16 @@ from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 import aiohttp
 
+def count_rune(s: str) -> int:
+    """等价Go utf8.RuneCountInString，统计Unicode字符数"""
+    return len(list(s))
+
 @register("bilibili_danmaku", "limou3434", "将QQ留言转为B站直播间弹幕，调用Go后端接口", "1.0.0")
 class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Handler 在插件类中定义，如这里的 helloworld 函数
     def __init__(self, context: Context): # Context 类用于插件与 AstrBot Core 交互，可以由此调用 AstrBot Core 提供的各种 API
         super().__init__(context)
         self.api_endpoint = "http://172.18.167.28:8023/send_danmaku" # Go 弹幕接口内网地址
-        self.max_danmaku_len = 30 # 和 Go 服务保持一致：【sender】msg 拼接，总上限 30 字符
+        self.max_danmaku_len = 35 # 和 Go 服务保持一致：【sender】msg 拼接，总上限 30 字符
     
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
