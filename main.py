@@ -30,43 +30,41 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
         message_str = event.message_str # 用户发的纯文本消息字符串
         message_chain = event.get_messages() # 用户所发的消息的消息链 from astrbot.api.message_components import *
         logger.info(message_chain)
-       
+        
         # 移除指令前缀 "/留言"，拿到真正用户留言内容
         cmd_prefix = "/留言"
         content = message_str.strip()
-
         if content.startswith(cmd_prefix):
             content = content[len(cmd_prefix):].strip()
-       
+        
         if not content:
             yield event.plain_result("❌ 啊啊啊留言内容不能为空哇！用法：/留言 你想说的话的说（认真）")
             return
-
         # 昵称裁剪：超过 5 字自动截断为前 5 个字符
         short_name = user_name[:5]
         max_total_char = 35  # 整体弹幕最多 35 字符，和 Go 保持一致
         bracket_len = 2 # 【】两个符号，各算 1 字符
         short_name_len = len(short_name)
-        used_len = short_name_len + bracket_len
+        # 整体弹幕格式：【short_name】留言：content
+        fixed_text = "留言："
+        fixed_len = len(fixed_text)
+        used_len = short_name_len + bracket_len + fixed_len
         remain_for_msg = max_total_char - used_len
-
         if remain_for_msg <= 0:
             yield event.plain_result(f"❌ 昵称裁剪后【{short_name}】空间不足，无法附加留言发送弹幕")
             return
-
         if len(content) > remain_for_msg:
             yield event.plain_result(
                 f"❌ 留言过长！\n昵称已自动裁剪为【{short_name}】，剩余可写{remain_for_msg}字符\n当前留言长度：{len(content)}"
             )
             return
-
-        # 拼接最终弹幕文本
-        full_text = f"【{short_name}】{content}"
-        # 传给Go接口的sender使用裁剪后的昵称
+        # 最终完整弹幕文本（仅用于逻辑校验，不传给Go！）
+        full_text = f"【{short_name}】{fixed_text}{content}"
+        # 传给Go接口：sender=昵称，msg=固定前缀+用户内容
         try:
             params = {
                 "sender": short_name,
-                "msg": content
+                "msg": f"{fixed_text}{content}"
             }
             async with aiohttp.ClientSession() as session:
                 async with session.get(
@@ -75,7 +73,7 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as resp:
                     resp_text = await resp.text()
-                    yield event.plain_result(f"✅ 留言已提交")
+                    yield event.plain_result(f"✅ 留言弹幕已提交")
         except aiohttp.ClientConnectionError:
             yield event.plain_result("❌ 无法连接弹幕后端，请检查 Go 服务是否启动，确认 172.18.167.28:8023 网络连通")
         except aiohttp.ClientError:
