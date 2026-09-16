@@ -38,14 +38,15 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
         if not content:
             yield event.plain_result("❌ 留言内容不能为空！用法：/留言 你想说的话")
             return
-        # 预拼接弹幕文本，和Go端逻辑保持一致 【QQ昵称】留言内容
-        full_text = f"【{user_name}】{content}"
-        # 前置长度校验，提前拦截，减少无效请求
-        if len(full_text) > self.max_danmaku_len:
+        # 限制【留言本体】最多25字符
+        max_msg_len = 25
+        if len(content) > max_msg_len:
             yield event.plain_result(
-                f"❌ 弹幕过长！拼接后【{full_text}】长度{len(full_text)}，最多允许{self.max_danmaku_len}字符"
+                f"❌ 留言内容过长！\n你输入：{content}\n当前长度{len(content)}，留言最多允许{max_msg_len}字符。"
             )
             return
+        # 预拼接完整弹幕文本（【昵称】+留言），Go侧还会校验总长度上限30
+        full_text = f"【{user_name}】{content}"
         # 异步HTTP请求，使用aiohttp，符合AstrBot规范
         try:
             params = {
@@ -59,7 +60,7 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as resp:
                     resp_text = await resp.text()
-                    yield event.plain_result(f"✅ 留言已提交，接口返回：{resp_text}")
+                    yield event.plain_result(f"✅ 留言已提交，完整弹幕：{full_text}\n接口返回：{resp_text}")
         except aiohttp.ClientConnectionError:
             yield event.plain_result("❌ 无法连接弹幕后端，请检查Go服务是否启动，确认172.18.167.28:8023网络连通")
         except aiohttp.ClientError:
@@ -69,6 +70,6 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
         except Exception as e:
             # 兜底捕获，避免插件崩溃
             yield event.plain_result(f"❌ 未知错误：{str(e)}")
-    
+
     async def terminate(self):
         """可选择实现异步的插件销毁方法，当插件被卸载/停用时会调用。"""
