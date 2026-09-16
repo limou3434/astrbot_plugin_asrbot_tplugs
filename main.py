@@ -25,24 +25,27 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
     @filter.command("留言")
     async def send(self, event: AstrMessageEvent):
         """这是一个哔哩哔哩留言指令，可以把 QQ 消息转化为弹幕发送到某个 b 站 up 主的直播间中""" # 这是 handler 的描述，将会被解析方便用户了解插件内容。建议填写。
+        # 获取发送者的一些信息
         user_name = event.get_sender_name() # 获取发送者 QQ 昵称
         message_str = event.message_str # 用户发的纯文本消息字符串
         message_chain = event.get_messages() # 用户所发的消息的消息链 from astrbot.api.message_components import *
         logger.info(message_chain)
+       
         # 移除指令前缀 "/留言"，拿到真正用户留言内容
         cmd_prefix = "/留言"
         content = message_str.strip()
+
         if content.startswith(cmd_prefix):
             content = content[len(cmd_prefix):].strip()
-        # 校验：不能为空内容
+       
         if not content:
-            yield event.plain_result("❌ 留言内容不能为空！用法：/留言 你想说的话")
+            yield event.plain_result("❌ 啊啊啊留言内容不能为空哇！用法：/留言 你想说的话的说（认真）")
             return
 
-        # 昵称裁剪：超过5字自动截断为前5个字符
+        # 昵称裁剪：超过 5 字自动截断为前 5 个字符
         short_name = user_name[:5]
-        max_total_char = 35  # 整体弹幕最多35字符，和Go保持一致
-        bracket_len = 2 # 【】两个符号，各算1字符
+        max_total_char = 35  # 整体弹幕最多 35 字符，和 Go 保持一致
+        bracket_len = 2 # 【】两个符号，各算 1 字符
         short_name_len = len(short_name)
         used_len = short_name_len + bracket_len
         remain_for_msg = max_total_char - used_len
@@ -72,13 +75,13 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as resp:
                     resp_text = await resp.text()
-                    yield event.plain_result(f"✅ 留言已提交，完整弹幕：{full_text}\n接口返回：{resp_text}")
+                    yield event.plain_result(f"✅ 留言已提交")
         except aiohttp.ClientConnectionError:
-            yield event.plain_result("❌ 无法连接弹幕后端，请检查Go服务是否启动，确认172.18.167.28:8023网络连通")
+            yield event.plain_result("❌ 无法连接弹幕后端，请检查 Go 服务是否启动，确认 172.18.167.28:8023 网络连通")
         except aiohttp.ClientError:
             yield event.plain_result("❌ 网络请求异常，调用弹幕接口失败")
         except TimeoutError:
-            yield event.plain_result("❌ 请求超时，Go服务响应超时")
+            yield event.plain_result("❌ 请求超时，Go 服务响应超时")
         except Exception as e:
             # 兜底捕获，避免插件崩溃
             yield event.plain_result(f"❌ 未知错误：{str(e)}")

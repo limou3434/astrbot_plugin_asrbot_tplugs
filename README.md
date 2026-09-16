@@ -1,14 +1,19 @@
-# astrbot-plugin-helloworld
+# astrbot_plugin_asrbot_tplugs
 
-AstrBot 插件模板 / A template plugin for AstrBot plugin feature
+## 1.插件作用
 
-> [!NOTE]
-> This repo is just a template of [AstrBot](https://github.com/AstrBotDevs/AstrBot) Plugin.
-> 
-> [AstrBot](https://github.com/AstrBotDevs/AstrBot) is an agentic assistant for both personal and group conversations. It can be deployed across dozens of mainstream instant messaging platforms, including QQ, Telegram, Feishu, DingTalk, Slack, LINE, Discord, Matrix, etc. In addition, it provides a reliable and extensible conversational AI infrastructure for individuals, developers, and teams. Whether you need a personal AI companion, an intelligent customer support agent, an automation assistant, or an enterprise knowledge base, AstrBot enables you to quickly build AI applications directly within your existing messaging workflows.
+QQ 群聊中快速发送留言弹幕到哔哩哔哩直播间，主要针对以下应用场景：
 
-# Supports
+- 工作时间无法打开直播间摸鱼（太显眼），利用此方式和主播进行交互，黑听人友好工具
+- 账号被封禁，导致无法在直播间中发送弹幕
+- 给群友平时看直播多一些趣味弹幕
 
-- [AstrBot Repo](https://github.com/AstrBotDevs/AstrBot)
-- [AstrBot Plugin Development Docs (Chinese)](https://docs.astrbot.app/dev/star/plugin-new.html)
-- [AstrBot Plugin Development Docs (English)](https://docs.astrbot.app/en/dev/star/plugin-new.html)
+## 2.前期配置
+
+1. 首先需要准备好一个 `bilibili` 账号
+2. 然后在浏览器上登录后，打开浏览器开发者工具（一般是快捷键 `[f12]`），找到 `bilibili.com` 的 `cookie` 数据
+3. 按照插件设置中描述需要的字段，把 `cookie` 字段复制过来
+
+## 3.使用方法
+
+使用 `@bot /留言 xxx` 即可快速从 `QQ` 群聊消息转化为弹幕发送到指定直播间
