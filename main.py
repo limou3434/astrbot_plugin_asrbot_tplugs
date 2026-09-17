@@ -1,7 +1,7 @@
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
-from astrbot.api.message_components import MessageChain
+from astrbot.api.message_components import Plain
 import aiohttp
 import json
 import os
@@ -13,12 +13,12 @@ def count_rune(s: str) -> int:
     """等价Go utf8.RuneCountInString，统计Unicode字符数"""
     return len(list(s))
 
-@register("bilibili_danmaku", "limou3434", "将QQ留言转为B站直播间弹幕，调用Go后端接口", "1.0.0")
-class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Handler 在插件类中定义，如这里的 helloworld 函数
-    def __init__(self, context: Context): # Context 类用于插件与 AstrBot Core 交互，可以由此调用 AstrBot Core 提供的各种 API
+@register("bilibili_danmaku", "limou3434", "梦寝兔兔专用群聊插件：QQ留言转B站弹幕 + 生日定时私聊提醒", "1.0.0")
+class MyPlugin(Star):
+    def __init__(self, context: Context):
         super().__init__(context)
-        self.api_endpoint = "http://172.18.167.28:8023/send_danmaku" # Go 弹幕接口内网地址
-        self.max_danmaku_len = 35 # 和 Go 服务保持一致：【sender】msg 拼接，总上限 30 字符
+        self.api_endpoint = "http://172.18.167.28:8023/send_danmaku"
+        self.max_danmaku_len = 35
         self.data_dir = os.path.join("data", "bilibili_danmaku")
         self.data_path = os.path.join(self.data_dir, "birthday_data.json")
         os.makedirs(self.data_dir, exist_ok=True)
@@ -46,31 +46,26 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
             json.dump(self.birth_data, f, ensure_ascii=False, indent=2)
     
     async def initialize(self):
-        """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
-        # 启动后台定时循环替代 @filter.scheduled_rule
         self.birth_task = asyncio.create_task(self.birth_loop())
     
     async def birth_loop(self):
         # 每日早上8点执行生日检查
         while True:
             now = datetime.now()
-            # 计算距离今日/明日 08:00 的等待秒数
             next_run = datetime(now.year, now.month, now.day, 8, 0, 0)
             if now >= next_run:
                 next_run = next_run.replace(day=now.day + 1)
             sleep_sec = (next_run - now).total_seconds()
             await asyncio.sleep(sleep_sec)
-            # 执行生日检测
             await self.daily_birthday_check()
     
     @filter.command("你好")
     async def helloworld(self, event: AstrMessageEvent):
-        """这是一个 hello world 指令，AstrMessageEvent 是 AstrBot 的消息事件对象，存储了消息发送者、消息内容等信息，而 AstrBotMessage 是 AstrBot 的消息对象，存储了消息平台下发的消息的具体内容，可以通过 event.message_obj 获取""" # 这是 handler 的描述，将会被解析方便用户了解插件内容。建议填写。
-        user_name = event.get_sender_name() # 获取发送者 QQ 昵称
-        message_str = event.message_str # 用户发的纯文本消息字符串
-        message_chain = event.get_messages() # 用户所发的消息的消息链 from astrbot.api.message_components import *
+        user_name = event.get_sender_name()
+        message_str = event.message_str
+        message_chain = event.get_messages()
         logger.info(message_chain)
-        yield event.plain_result(f"Hello, {user_name}, 你发了 {message_str}!") # 发送一条纯文本消息
+        yield event.plain_result(f"Hello, {user_name}, 你发了 {message_str}!")
     
     @filter.command("留言")
     async def send(self, event: AstrMessageEvent, msg: str = ""):
@@ -79,9 +74,7 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
         if not msg.strip():
             yield event.plain_result("❌ 啊啊啊留言内容不能为空哇！用法：/留言 你想说的话的说（认真）")
             return
-        # 昵称裁剪最多5字符
         short_name = user_name[:5]
-        # 插件在这里组装完整弹幕
         full_danmaku = f"【{short_name}】留言：{msg.strip()}"
         rune_cnt = count_rune(full_danmaku)
         if rune_cnt > self.max_danmaku_len:
@@ -213,7 +206,6 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
         self.save_birth_data()
         yield event.plain_result(f"✅ 管理提醒 QQ 已设置为：{qq}")
 
-    # 绑定会话UMO（主播本人私聊机器人发送）
     @filter.command("绑定主播")
     async def bind_anchor(self, event: AstrMessageEvent):
         """/绑定主播，主播私聊机器人执行，保存私聊会话标识"""
@@ -221,7 +213,6 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
         self.save_birth_data()
         yield event.plain_result("✅ 主播会话绑定成功！后续生日提醒将发送到当前私聊会话")
 
-    # 绑定会话UMO（管理本人私聊机器人发送）
     @filter.command("绑定管理")
     async def bind_manager(self, event: AstrMessageEvent):
         """/绑定管理，管理私聊机器人执行，保存私聊会话标识"""
@@ -260,14 +251,13 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
             return
         
         test_msg = "🧪【测试提醒】生日通知功能测试，这条是手动触发的消息，不是定时任务！"
-        chain = MessageChain().message(test_msg)
         send_list = []
         try:
             if anchor_umo:
-                await self.context.send_message(anchor_umo, chain)
+                await self.context.send_message(anchor_umo, [Plain(test_msg)])
                 send_list.append("主播")
             if manager_umo:
-                await self.context.send_message(manager_umo, chain)
+                await self.context.send_message(manager_umo, [Plain(test_msg)])
                 send_list.append("管理")
         except Exception as e:
             logger.error(f"发送测试通知异常: {e}")
@@ -300,22 +290,17 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
                 logger.warning(f"生日解析异常 {item}：{e}")
         if birthday_names:
             msg_text = f"🎂 今日生日提醒！\n{','.join(birthday_names)} 今天过生日！"
-            chain = MessageChain().message(msg_text)
             try:
-                # 发给主播
                 if anchor_umo:
-                    await self.context.send_message(anchor_umo, chain)
+                    await self.context.send_message(anchor_umo, [Plain(msg_text)])
                     logger.info(f"生日提醒发送给主播会话: {msg_text}")
-                # 发给管理
                 if manager_umo:
-                    await self.context.send_message(manager_umo, chain)
+                    await self.context.send_message(manager_umo, [Plain(msg_text)])
                     logger.info(f"生日提醒发送给管理会话: {msg_text}")
             except Exception as e:
                 logger.error(f"定时生日通知发送失败: {e}")
 
     async def terminate(self):
-        """可选择实现异步的插件销毁方法，当插件被卸载/停用时会调用。"""
-        # 关闭后台任务，防止残留
         if self.birth_task:
             self.birth_task.cancel()
             try:
