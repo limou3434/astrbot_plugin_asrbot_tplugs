@@ -1,6 +1,6 @@
 name: astrbot_plugin_asrbot_tplugs # 插件唯一识别名，以 astrbot_plugin_ 前缀开头
 display_name: 梦寝兔兔专用群聊插件 # 用于展示的名字，可以是方便人类阅读的名字
-desc: 使用 “@bot /留言 xxx” 即可快速从 QQ 群聊消息转化为弹幕发送到指定直播间 # 插件简短描述
+desc: 给梦寝兔兔粉丝群聊添加一些有趣的功能。 # 插件简短描述
 version: v1.0.0 # 插件版本号
 author: limou3434 # 作者
 repo: https://github.com/limou3434/astrbot_plugin_asrbot_tplugs # 插件的仓库地址
