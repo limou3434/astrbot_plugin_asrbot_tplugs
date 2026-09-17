@@ -1,15 +1,18 @@
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
+from astrbot.api.message_components import MessageChain
 import aiohttp
 import json
 import os
 from datetime import datetime
 from zhdate import ZhDate
 import asyncio
+
 def count_rune(s: str) -> int:
     """等价Go utf8.RuneCountInString，统计Unicode字符数"""
     return len(list(s))
+
 @register("bilibili_danmaku", "limou3434", "将QQ留言转为B站直播间弹幕，调用Go后端接口", "1.0.0")
 class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Handler 在插件类中定义，如这里的 helloworld 函数
     def __init__(self, context: Context): # Context 类用于插件与 AstrBot Core 交互，可以由此调用 AstrBot Core 提供的各种 API
@@ -21,6 +24,7 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
         os.makedirs(self.data_dir, exist_ok=True)
         self.birth_data = self.load_birth_data()
         self.birth_task = None
+
     def load_birth_data(self):
         if os.path.exists(self.data_path):
             try:
@@ -32,6 +36,8 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
             "notify_enable": True,
             "anchor_qq": "",
             "manager_qq": "",
+            "anchor_umo": "",
+            "manager_umo": "",
             "birthday_list": []
         }
     
@@ -181,7 +187,7 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
         """/生日移除 昵称，删除对应人的生日记录"""
         target_name = msg.strip()
         if not target_name:
-            yield event.plain_result("❌ 需要填写昵称，用法：/移除生日 阿白")
+            yield event.plain_result("❌ 需要填写昵称，用法：/生日移除 阿白")
             return
         old_len = len(self.birth_data["birthday_list"])
         self.birth_data["birthday_list"] = [item for item in self.birth_data["birthday_list"] if item["name"] != target_name]
@@ -207,53 +213,76 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
         self.save_birth_data()
         yield event.plain_result(f"✅ 管理提醒 QQ 已设置为：{qq}")
 
+    # 绑定会话UMO（主播本人私聊机器人发送）
+    @filter.command("绑定主播")
+    async def bind_anchor(self, event: AstrMessageEvent):
+        """/绑定主播，主播私聊机器人执行，保存私聊会话标识"""
+        self.birth_data["anchor_umo"] = event.unified_msg_origin
+        self.save_birth_data()
+        yield event.plain_result("✅ 主播会话绑定成功！后续生日提醒将发送到当前私聊会话")
+
+    # 绑定会话UMO（管理本人私聊机器人发送）
+    @filter.command("绑定管理")
+    async def bind_manager(self, event: AstrMessageEvent):
+        """/绑定管理，管理私聊机器人执行，保存私聊会话标识"""
+        self.birth_data["manager_umo"] = event.unified_msg_origin
+        self.save_birth_data()
+        yield event.plain_result("✅ 管理会话绑定成功！后续生日提醒将发送到当前私聊会话")
+
     @filter.command("查看接收")
     async def show_notify_target(self, event: AstrMessageEvent):
-        """/通知接收，查看当前配置的主播、管理QQ"""
+        """/查看接收，查看当前配置的主播、管理QQ与绑定状态"""
         anchor_qq = self.birth_data.get("anchor_qq", "未设置")
         manager_qq = self.birth_data.get("manager_qq", "未设置")
+        anchor_bind = "已绑定" if self.birth_data.get("anchor_umo") else "未绑定"
+        manager_bind = "已绑定" if self.birth_data.get("manager_umo") else "未绑定"
         status = "开启" if self.birth_data.get("notify_enable") else "关闭"
         msg = (
             f"📩生日通知配置\n"
             f"通知状态：{status}\n"
-            f"主播 QQ：{anchor_qq}\n"
-            f"管理 QQ：{manager_qq}"
+            f"主播 QQ：{anchor_qq} | {anchor_bind}\n"
+            f"管理 QQ：{manager_qq} | {manager_bind}"
         )
         yield event.plain_result(msg)
 
     @filter.command("立刻通知")
     async def test_notify(self, event: AstrMessageEvent):
         """/立刻通知，立刻发送一次生日提醒给主播和管理，用来测试私聊通知功能"""
-        anchor_qq = self.birth_data.get("anchor_qq", "")
-        manager_qq = self.birth_data.get("manager_qq", "")
+        anchor_umo = self.birth_data.get("anchor_umo", "")
+        manager_umo = self.birth_data.get("manager_umo", "")
         notify_enable = self.birth_data.get("notify_enable", False)
 
         if not notify_enable:
             yield event.plain_result("❌ 当前生日通知总开关是关闭状态，无法发送测试消息，请先 /生日通知 开")
             return
-
-        if not anchor_qq and not manager_qq:
-            yield event.plain_result("❌ 主播QQ、管理QQ都未设置，不能发送测试通知，请先配置接收人")
+        if not anchor_umo and not manager_umo:
+            yield event.plain_result("❌ 主播、管理会话都未绑定，请主播/管理私聊机器人执行 /绑定主播 /绑定管理")
             return
         
         test_msg = "🧪【测试提醒】生日通知功能测试，这条是手动触发的消息，不是定时任务！"
+        chain = MessageChain().message(test_msg)
         send_list = []
-        if anchor_qq:
-            await self.context.send_private_message(anchor_qq, test_msg)
-            send_list.append(f"主播({anchor_qq})")
-        if manager_qq:
-            await self.context.send_private_message(manager_qq, test_msg)
-            send_list.append(f"管理({manager_qq})")
+        try:
+            if anchor_umo:
+                await self.context.send_message(anchor_umo, chain)
+                send_list.append("主播")
+            if manager_umo:
+                await self.context.send_message(manager_umo, chain)
+                send_list.append("管理")
+        except Exception as e:
+            logger.error(f"发送测试通知异常: {e}")
+            yield event.plain_result(f"⚠️ 消息发送出错：{str(e)}")
+            return
         
         yield event.plain_result(f"✅ 测试消息已发送给：{','.join(send_list)}")
 
     async def daily_birthday_check(self):
         if not self.birth_data["notify_enable"]:
             return
-        anchor_qq = self.birth_data.get("anchor_qq", "")
-        manager_qq = self.birth_data.get("manager_qq", "")
-        if not anchor_qq and not manager_qq:
-            logger.warning("主播和管理QQ均未设置，无法发送生日提醒")
+        anchor_umo = self.birth_data.get("anchor_umo", "")
+        manager_umo = self.birth_data.get("manager_umo", "")
+        if not anchor_umo and not manager_umo:
+            logger.warning("主播和管理会话都未绑定，无法发送生日提醒，请使用 /绑定主播 /绑定管理")
             return
         today = datetime.now()
         birthday_names = []
@@ -270,15 +299,19 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
             except Exception as e:
                 logger.warning(f"生日解析异常 {item}：{e}")
         if birthday_names:
-            msg = f"🎂 今日生日提醒！\n{','.join(birthday_names)} 今天过生日！"
-            # 发给主播
-            if anchor_qq:
-                await self.context.send_private_message(anchor_qq, msg)
-                logger.info(f"生日提醒已发送给主播 {anchor_qq}: {msg}")
-            # 发给管理
-            if manager_qq:
-                await self.context.send_private_message(manager_qq, msg)
-                logger.info(f"生日提醒已发送给管理 {manager_qq}: {msg}")
+            msg_text = f"🎂 今日生日提醒！\n{','.join(birthday_names)} 今天过生日！"
+            chain = MessageChain().message(msg_text)
+            try:
+                # 发给主播
+                if anchor_umo:
+                    await self.context.send_message(anchor_umo, chain)
+                    logger.info(f"生日提醒发送给主播会话: {msg_text}")
+                # 发给管理
+                if manager_umo:
+                    await self.context.send_message(manager_umo, chain)
+                    logger.info(f"生日提醒发送给管理会话: {msg_text}")
+            except Exception as e:
+                logger.error(f"定时生日通知发送失败: {e}")
 
     async def terminate(self):
         """可选择实现异步的插件销毁方法，当插件被卸载/停用时会调用。"""
