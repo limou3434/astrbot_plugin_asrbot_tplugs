@@ -221,6 +221,32 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
         )
         yield event.plain_result(msg)
 
+    @filter.command("立刻通知")
+    async def test_notify(self, event: AstrMessageEvent):
+        """/立刻通知，立刻发送一次生日提醒给主播和管理，用来测试私聊通知功能"""
+        anchor_qq = self.birth_data.get("anchor_qq", "")
+        manager_qq = self.birth_data.get("manager_qq", "")
+        notify_enable = self.birth_data.get("notify_enable", False)
+
+        if not notify_enable:
+            yield event.plain_result("❌ 当前生日通知总开关是关闭状态，无法发送测试消息，请先 /生日通知 开")
+            return
+
+        if not anchor_qq and not manager_qq:
+            yield event.plain_result("❌ 主播QQ、管理QQ都未设置，不能发送测试通知，请先配置接收人")
+            return
+        
+        test_msg = "🧪【测试提醒】生日通知功能测试，这条是手动触发的消息，不是定时任务！"
+        send_list = []
+        if anchor_qq:
+            await self.context.send_private_message(anchor_qq, test_msg)
+            send_list.append(f"主播({anchor_qq})")
+        if manager_qq:
+            await self.context.send_private_message(manager_qq, test_msg)
+            send_list.append(f"管理({manager_qq})")
+        
+        yield event.plain_result(f"✅ 测试消息已发送给：{','.join(send_list)}")
+
     async def daily_birthday_check(self):
         if not self.birth_data["notify_enable"]:
             return
