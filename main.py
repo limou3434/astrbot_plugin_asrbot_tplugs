@@ -207,6 +207,20 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
         self.save_birth_data()
         yield event.plain_result(f"✅ 管理提醒 QQ 已设置为：{qq}")
 
+    @filter.command("查看接收")
+    async def show_notify_target(self, event: AstrMessageEvent):
+        """/通知接收，查看当前配置的主播、管理QQ"""
+        anchor_qq = self.birth_data.get("anchor_qq", "未设置")
+        manager_qq = self.birth_data.get("manager_qq", "未设置")
+        status = "开启" if self.birth_data.get("notify_enable") else "关闭"
+        msg = (
+            f"📩生日通知配置\n"
+            f"通知状态：{status}\n"
+            f"主播 QQ：{anchor_qq}\n"
+            f"管理 QQ：{manager_qq}"
+        )
+        yield event.plain_result(msg)
+
     async def daily_birthday_check(self):
         if not self.birth_data["notify_enable"]:
             return
