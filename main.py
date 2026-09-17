@@ -7,7 +7,6 @@ import os
 from datetime import datetime
 from zhdate import ZhDate
 import asyncio
-
 def count_rune(s: str) -> int:
     """等价Go utf8.RuneCountInString，统计Unicode字符数"""
     return len(list(s))
@@ -22,7 +21,6 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
         os.makedirs(self.data_dir, exist_ok=True)
         self.birth_data = self.load_birth_data()
         self.birth_task = None
-
     def load_birth_data(self):
         if os.path.exists(self.data_path):
             try:
@@ -33,11 +31,14 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
         return {
             "notify_enable": True,
             "anchor_qq": "",
+            "manager_qq": "",
             "birthday_list": []
         }
+    
     def save_birth_data(self):
         with open(self.data_path, "w", encoding="utf-8") as f:
             json.dump(self.birth_data, f, ensure_ascii=False, indent=2)
+    
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
         # 启动后台定时循环替代 @filter.scheduled_rule
@@ -55,8 +56,8 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
             await asyncio.sleep(sleep_sec)
             # 执行生日检测
             await self.daily_birthday_check()
-
-    @filter.command("helloworld")
+    
+    @filter.command("你好")
     async def helloworld(self, event: AstrMessageEvent):
         """这是一个 hello world 指令，AstrMessageEvent 是 AstrBot 的消息事件对象，存储了消息发送者、消息内容等信息，而 AstrBotMessage 是 AstrBot 的消息对象，存储了消息平台下发的消息的具体内容，可以通过 event.message_obj 获取""" # 这是 handler 的描述，将会被解析方便用户了解插件内容。建议填写。
         user_name = event.get_sender_name() # 获取发送者 QQ 昵称
@@ -103,6 +104,7 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
             yield event.plain_result("❌ 请求超时，Go 服务响应超时")
         except Exception as e:
             yield event.plain_result(f"❌ 未知错误：{str(e)}")
+    
     @filter.command("生日记录")
     async def record_birthday(self, event: AstrMessageEvent):
         """/生日记录 昵称:农历/日历:月份:日期"""
@@ -146,27 +148,38 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
             })
         self.save_birth_data()
         yield event.plain_result(f"✅ 生日记录成功！\n{name}｜{date_type} {month}月{day}日")
+
     @filter.command("生日通知")
-    async def toggle_birth_notify(self, event: AstrMessageEvent):
+    async def toggle_birth_notify(self, event: AstrMessageEvent, msg: str = ""):
         """/生日通知 开 / /生日通知 关"""
-        arg = event.message_str.strip()
+        arg = msg.strip()
         if arg == "开":
             self.birth_data["notify_enable"] = True
             self.save_birth_data()
-            yield event.plain_result("✅ 生日提醒已开启，生日当天会私聊主播")
+            yield event.plain_result("✅ 生日提醒已开启，生日当天会私聊主播和管理")
         elif arg == "关":
             self.birth_data["notify_enable"] = False
             self.save_birth_data()
             yield event.plain_result("✅ 生日提醒已关闭")
         else:
             yield event.plain_result("❌ 参数只能是【开】或者【关】\n用法：/生日通知 开")
+
     @filter.command("设置主播")
-    async def set_anchor_qq(self, event: AstrMessageEvent):
+    async def set_anchor_qq(self, event: AstrMessageEvent, msg: str = ""):
         """/设置主播 12345678"""
-        qq = event.message_str.strip()
+        qq = msg.strip()
         self.birth_data["anchor_qq"] = qq
         self.save_birth_data()
         yield event.plain_result(f"✅ 主播提醒 QQ 已设置为：{qq}")
+
+    @filter.command("设置管理")
+    async def set_manager_qq(self, event: AstrMessageEvent, msg: str = ""):
+        """/设置管理 12345678"""
+        qq = msg.strip()
+        self.birth_data["manager_qq"] = qq
+        self.save_birth_data()
+        yield event.plain_result(f"✅ 管理提醒 QQ 已设置为：{qq}")
+
     @filter.command("生日列表")
     async def show_birth_list(self, event: AstrMessageEvent):
         """/生日列表 查看所有登记的生日"""
@@ -179,12 +192,28 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
             msg += f"{item['name']} | {item['type']} {item['month']}月{item['day']}日\n"
         yield event.plain_result(msg)
 
+    @filter.command("移除生日")
+    async def remove_birthday(self, event: AstrMessageEvent, msg: str = ""):
+        """/移除生日 昵称，删除对应人的生日记录"""
+        target_name = msg.strip()
+        if not target_name:
+            yield event.plain_result("❌ 需要填写昵称，用法：/移除生日 阿白")
+            return
+        old_len = len(self.birth_data["birthday_list"])
+        self.birth_data["birthday_list"] = [item for item in self.birth_data["birthday_list"] if item["name"] != target_name]
+        if len(self.birth_data["birthday_list"]) < old_len:
+            self.save_birth_data()
+            yield event.plain_result(f"✅ 已移除【{target_name}】的生日记录")
+        else:
+            yield event.plain_result(f"❌ 找不到【{target_name}】的生日记录")
+
     async def daily_birthday_check(self):
         if not self.birth_data["notify_enable"]:
             return
         anchor_qq = self.birth_data.get("anchor_qq", "")
-        if not anchor_qq:
-            logger.warning("未设置主播 QQ，无法发送生日提醒")
+        manager_qq = self.birth_data.get("manager_qq", "")
+        if not anchor_qq and not manager_qq:
+            logger.warning("主播和管理QQ均未设置，无法发送生日提醒")
             return
         today = datetime.now()
         birthday_names = []
@@ -202,8 +231,14 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
                 logger.warning(f"生日解析异常 {item}：{e}")
         if birthday_names:
             msg = f"🎂 今日生日提醒！\n{','.join(birthday_names)} 今天过生日！"
-            await self.context.send_private_message(anchor_qq, msg)
-            logger.info(f"生日提醒已发送给主播 {anchor_qq}: {msg}")
+            # 发给主播
+            if anchor_qq:
+                await self.context.send_private_message(anchor_qq, msg)
+                logger.info(f"生日提醒已发送给主播 {anchor_qq}: {msg}")
+            # 发给管理
+            if manager_qq:
+                await self.context.send_private_message(manager_qq, msg)
+                logger.info(f"生日提醒已发送给管理 {manager_qq}: {msg}")
 
     async def terminate(self):
         """可选择实现异步的插件销毁方法，当插件被卸载/停用时会调用。"""
