@@ -253,10 +253,14 @@ class MyPlugin(Star):
         send_list = []
         try:
             if anchor_umo:
-                await self.context.send_message(anchor_umo, test_msg)
+                res = MessageEventResult()
+                res.plain(test_msg)
+                await self.context.send_message(anchor_umo, res)
                 send_list.append("主播")
             if manager_umo:
-                await self.context.send_message(manager_umo, test_msg)
+                res = MessageEventResult()
+                res.plain(test_msg)
+                await self.context.send_message(manager_umo, res)
                 send_list.append("管理")
         except Exception as e:
             logger.error(f"发送测试通知异常: {e}")
@@ -291,10 +295,14 @@ class MyPlugin(Star):
             msg_text = f"🎂 今日生日提醒！\n{','.join(birthday_names)} 今天过生日！"
             try:
                 if anchor_umo:
-                    await self.context.send_message(anchor_umo, msg_text)
+                    res = MessageEventResult()
+                    res.plain(msg_text)
+                    await self.context.send_message(anchor_umo, res)
                     logger.info(f"生日提醒发送给主播会话: {msg_text}")
                 if manager_umo:
-                    await self.context.send_message(manager_umo, msg_text)
+                    res = MessageEventResult()
+                    res.plain(msg_text)
+                    await self.context.send_message(manager_umo, res)
                     logger.info(f"生日提醒发送给管理会话: {msg_text}")
             except Exception as e:
                 logger.error(f"定时生日通知发送失败: {e}")
