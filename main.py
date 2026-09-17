@@ -164,6 +164,33 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
         else:
             yield event.plain_result("❌ 参数只能是【开】或者【关】\n用法：/生日通知 开")
 
+    @filter.command("生日列表")
+    async def show_birth_list(self, event: AstrMessageEvent):
+        """/生日列表 查看所有登记的生日"""
+        lst = self.birth_data["birthday_list"]
+        if not lst:
+            yield event.plain_result("📭 暂无登记的生日记录")
+            return
+        msg = "📋 已登记生日列表：\n"
+        for item in lst:
+            msg += f"{item['name']} | {item['type']} {item['month']}月{item['day']}日\n"
+        yield event.plain_result(msg)
+
+    @filter.command("生日移除")
+    async def remove_birthday(self, event: AstrMessageEvent, msg: str = ""):
+        """/生日移除 昵称，删除对应人的生日记录"""
+        target_name = msg.strip()
+        if not target_name:
+            yield event.plain_result("❌ 需要填写昵称，用法：/移除生日 阿白")
+            return
+        old_len = len(self.birth_data["birthday_list"])
+        self.birth_data["birthday_list"] = [item for item in self.birth_data["birthday_list"] if item["name"] != target_name]
+        if len(self.birth_data["birthday_list"]) < old_len:
+            self.save_birth_data()
+            yield event.plain_result(f"✅ 已移除【{target_name}】的生日记录")
+        else:
+            yield event.plain_result(f"❌ 找不到【{target_name}】的生日记录")
+
     @filter.command("设置主播")
     async def set_anchor_qq(self, event: AstrMessageEvent, msg: str = ""):
         """/设置主播 12345678"""
@@ -179,33 +206,6 @@ class MyPlugin(Star): # 插件需要继承 Star 类，具体的处理函数 Hand
         self.birth_data["manager_qq"] = qq
         self.save_birth_data()
         yield event.plain_result(f"✅ 管理提醒 QQ 已设置为：{qq}")
-
-    @filter.command("生日列表")
-    async def show_birth_list(self, event: AstrMessageEvent):
-        """/生日列表 查看所有登记的生日"""
-        lst = self.birth_data["birthday_list"]
-        if not lst:
-            yield event.plain_result("📭 暂无登记的生日记录")
-            return
-        msg = "📋 已登记生日列表：\n"
-        for item in lst:
-            msg += f"{item['name']} | {item['type']} {item['month']}月{item['day']}日\n"
-        yield event.plain_result(msg)
-
-    @filter.command("移除生日")
-    async def remove_birthday(self, event: AstrMessageEvent, msg: str = ""):
-        """/移除生日 昵称，删除对应人的生日记录"""
-        target_name = msg.strip()
-        if not target_name:
-            yield event.plain_result("❌ 需要填写昵称，用法：/移除生日 阿白")
-            return
-        old_len = len(self.birth_data["birthday_list"])
-        self.birth_data["birthday_list"] = [item for item in self.birth_data["birthday_list"] if item["name"] != target_name]
-        if len(self.birth_data["birthday_list"]) < old_len:
-            self.save_birth_data()
-            yield event.plain_result(f"✅ 已移除【{target_name}】的生日记录")
-        else:
-            yield event.plain_result(f"❌ 找不到【{target_name}】的生日记录")
 
     async def daily_birthday_check(self):
         if not self.birth_data["notify_enable"]:
