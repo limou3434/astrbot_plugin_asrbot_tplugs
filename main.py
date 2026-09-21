@@ -10,7 +10,7 @@ from datetime import datetime
 from zhdate import ZhDate
 import asyncio
 
-@register("bilibili_danmaku", "limou3434", "梦寝兔兔专用群聊插件", "1.1.3")
+@register("bilibili_danmaku", "limou3434", "梦寝兔兔专用群聊插件", "1.1.5")
 class MyPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
@@ -21,6 +21,8 @@ class MyPlugin(Star):
         os.makedirs(self.data_dir, exist_ok=True)
         self.birth_data = self.load_birth_data()
         self.birth_task = None
+        # 今日提醒标记，防止同一天多次触发
+        self.today_alerted = None
 
     def count_rune(self, s: str) -> int:
         """等价Go utf8.RuneCountInString，统计Unicode字符数"""
@@ -58,6 +60,7 @@ class MyPlugin(Star):
                 await self.birth_task
             except asyncio.CancelledError:
                 logger.info("【生日循环】旧定时任务已取消")
+        self.today_alerted = None
         self.birth_task = asyncio.create_task(self.birth_loop())
         logger.info("【生日循环】生日定时任务已重新启动，加载最新提醒时间")
 
@@ -73,6 +76,7 @@ class MyPlugin(Star):
         today = datetime.now()
         birthday_names = []
         lunar_today = ZhDate.from_datetime(today)
+        # 遍历全部生日，收集所有今日生日人员
         for item in self.birth_data["birthday_list"]:
             try:
                 if item["type"] == "国历":
@@ -90,13 +94,15 @@ class MyPlugin(Star):
             logger.info("【生日检查】今日无生日，不发送通知")
             return
 
-        msg_text = f"🎂 今日生日提醒！\n{','.join(birthday_names)} 今天过生日！"
+        # 全部合并为一条消息，多人放在同一条
+        names_str = "、".join(birthday_names)
+        msg_text = f"🎂 今日生日提醒！\n{names_str} 今天过生日！"
         logger.info(f"【生日检查】准备发送消息内容：{msg_text}")
         try:
             anchor_umo = self.birth_data.get("anchor_umo", "")
             manager_umo = self.birth_data.get("manager_umo", "")
             msg_chain = MessageChain([Plain(msg_text)])
-            # 主播、管理两个会话全部发送
+            # 主播、管理各收到这一条合并后的消息
             if anchor_umo != "":
                 await self.context.send_message(anchor_umo, msg_chain)
                 logger.info(f"【生日检查】生日提醒发送给主播会话成功")
@@ -120,15 +126,31 @@ class MyPlugin(Star):
                 mi = int(m_str)
                 sec = int(s_str)
                 target = datetime(now.year, now.month, now.day, h, mi, sec)
-                # 当前时间超过目标时间，自动切到明天同一时刻
-                if now > target:
+
+                # 判断今天是否已经提醒过
+                today_key = (now.year, now.month, now.day)
+                if self.today_alerted == today_key:
+                    # 今天已经提醒过，直接跳到明天
                     target = target.replace(day=now.day + 1)
-                    logger.info(f"【生日循环】当前时间已超过今日目标，自动切换到明天 {target.strftime('%Y-%m-%d %H:%M:%S')}")
+                    logger.info(f"【生日循环】今日已发送提醒，直接跳到明天 {target.strftime('%Y-%m-%d %H:%M:%S')}")
+                    sleep_sec = (target - now).total_seconds()
+                    await asyncio.sleep(sleep_sec)
+                    continue
+
+                # 当前时间超过目标时间
+                if now > target:
+                    # 执行一次检索，一次性收集所有生日并发送单条消息
+                    await self.daily_birthday_check()
+                    # 标记今天已经提醒，防止重复触发
+                    self.today_alerted = today_key
+                    # 目标改为明天
+                    target = target.replace(day=now.day + 1)
+                    logger.info(f"【生日循环】今日提醒完成，切换到明天 {target.strftime('%Y-%m-%d %H:%M:%S')}")
+
                 sleep_sec = (target - now).total_seconds()
                 logger.info(f"【生日循环】生日定时任务等待 {sleep_sec:.1f}s 后执行，目标时间：{target.strftime('%Y-%m-%d %H:%M:%S')}")
                 await asyncio.sleep(sleep_sec)
-                # 到点执行生日检索+通知
-                await self.daily_birthday_check()
+
             except Exception as e:
                 logger.error(f"【生日循环】生日定时循环异常，10秒后重试: {e}")
                 await asyncio.sleep(10)
@@ -266,7 +288,7 @@ class MyPlugin(Star):
             return
         self.birth_data["notify_time"] = f"{h}:{m}:{s}"
         self.save_birth_data()
-        # ✅ 修改时间后，自动重启定时任务加载新时间！
+        # 修改时间后，自动重启定时任务加载新时间
         await self.restart_birth_task()
         yield event.plain_result(f"✅ 生日提醒定时时间已设置为：{h}时{m}分{s}秒，定时任务已自动重启生效！")
 
