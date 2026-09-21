@@ -70,7 +70,6 @@ class MyPlugin(Star):
             try:
                 anchor_umo = self.birth_data.get("anchor_umo", "")
                 manager_umo = self.birth_data.get("manager_umo", "")
-                # ========== 重点修复：用MessageEventResult.plain，不再使用MessageChain和Plain组件 ==========
                 msg_result = MessageEventResult().plain(msg_text)
                 if anchor_umo:
                     await self.context.send_message(anchor_umo, msg_result)
@@ -103,8 +102,7 @@ class MyPlugin(Star):
     async def helloworld(self, event: AstrMessageEvent):
         user_name = event.get_sender_name()
         message_str = event.message_str
-        message_chain = event.get_messages()
-        logger.info(message_chain)
+        logger.info(message_str)
         yield event.plain_result(f"Hello, {user_name}, 你发了 {message_str}!")
 
     @filter.command("留言")
@@ -243,7 +241,7 @@ class MyPlugin(Star):
         qq = msg.strip()
         self.birth_data["anchor_qq"] = qq
         self.save_birth_data()
-        yield event.plain_result(f"✅ 主播提醒 QQ 已设置为：{qq}")
+        yield event.plain_result(f"✅ 主播QQ已设置为：{qq}（仍需要私聊执行 /绑定主播 完成占位绑定）")
 
     @filter.command("设置管理")
     async def set_manager_qq(self, event: AstrMessageEvent, msg: str = ""):
@@ -251,29 +249,71 @@ class MyPlugin(Star):
         qq = msg.strip()
         self.birth_data["manager_qq"] = qq
         self.save_birth_data()
-        yield event.plain_result(f"✅ 管理提醒 QQ 已设置为：{qq}")
+        yield event.plain_result(f"✅ 管理QQ已设置为：{qq}（仍需要私聊执行 /绑定管理 完成占位绑定）")
 
     @filter.command("绑定主播")
     async def bind_anchor(self, event: AstrMessageEvent):
-        """/绑定主播，主播私聊机器人执行，保存私聊会话标识"""
+        """/绑定主播，主播私聊机器人执行，保存私聊会话标识，占位唯一"""
+        # 校验：主播位已经被占用，禁止绑定
+        if self.birth_data.get("anchor_umo", "") != "":
+            yield event.plain_result("❌ 主播占位已被占用！需要当前绑定者执行【/解绑主播】释放占位后才能绑定")
+            return
         self.birth_data["anchor_umo"] = event.unified_msg_origin
         self.save_birth_data()
-        yield event.plain_result("✅ 主播会话绑定成功！后续生日提醒将发送到当前私聊会话")
+        yield event.plain_result("✅ 主播会话绑定成功！主播占位锁定，生日提醒将发送到此私聊会话")
 
     @filter.command("绑定管理")
     async def bind_manager(self, event: AstrMessageEvent):
-        """/绑定管理，管理私聊机器人执行，保存私聊会话标识"""
+        """/绑定管理，管理私聊机器人执行，保存私聊会话标识，占位唯一"""
+        # 校验：管理位已经被占用，禁止绑定
+        if self.birth_data.get("manager_umo", "") != "":
+            yield event.plain_result("❌ 管理占位已被占用！需要当前绑定者执行【/解绑管理】释放占位后才能绑定")
+            return
         self.birth_data["manager_umo"] = event.unified_msg_origin
         self.save_birth_data()
-        yield event.plain_result("✅ 管理会话绑定成功！后续生日提醒将发送到当前私聊会话")
+        yield event.plain_result("✅ 管理会话绑定成功！管理占位锁定，生日提醒将发送到此私聊会话")
+
+    @filter.command("解绑主播")
+    async def unbind_anchor(self, event: AstrMessageEvent):
+        """/解绑主播，仅绑定的主播本人可执行；解绑清空umo和QQ号"""
+        sender_qq = str(event.get_sender_id())
+        anchor_qq = self.birth_data.get("anchor_qq", "")
+        if anchor_qq == "":
+            yield event.plain_result("❌ 主播位暂无绑定信息，无需解绑")
+            return
+        # 校验：发送者QQ和记录的主播QQ不一致，拒绝解绑
+        if sender_qq != anchor_qq:
+            yield event.plain_result("❌ 权限不足！只有绑定的主播本人才能执行解绑主播")
+            return
+        # 解绑：清空umo 和 qq
+        self.birth_data["anchor_umo"] = ""
+        self.birth_data["anchor_qq"] = ""
+        self.save_birth_data()
+        yield event.plain_result("✅ 主播位已解绑，主播QQ与会话占位全部清空，可以重新绑定其他人")
+
+    @filter.command("解绑管理")
+    async def unbind_manager(self, event: AstrMessageEvent):
+        """/解绑管理，仅绑定的管理本人可执行；解绑清空umo和QQ号"""
+        sender_qq = str(event.get_sender_id())
+        manager_qq = self.birth_data.get("manager_qq", "")
+        if manager_qq == "":
+            yield event.plain_result("❌ 管理位暂无绑定信息，无需解绑")
+            return
+        if sender_qq != manager_qq:
+            yield event.plain_result("❌ 权限不足！只有绑定的管理本人才能执行解绑管理")
+            return
+        self.birth_data["manager_umo"] = ""
+        self.birth_data["manager_qq"] = ""
+        self.save_birth_data()
+        yield event.plain_result("✅ 管理位已解绑，管理QQ与会话占位全部清空，可以重新绑定其他人")
 
     @filter.command("查看接收")
     async def show_notify_target(self, event: AstrMessageEvent):
         """/查看接收，查看当前配置的主播、管理QQ与绑定状态"""
         anchor_qq = self.birth_data.get("anchor_qq", "未设置")
         manager_qq = self.birth_data.get("manager_qq", "未设置")
-        anchor_bind = "已绑定" if self.birth_data.get("anchor_umo") else "未绑定"
-        manager_bind = "已绑定" if self.birth_data.get("manager_umo") else "未绑定"
+        anchor_bind = "✅已绑定" if self.birth_data.get("anchor_umo") else "❌未绑定"
+        manager_bind = "✅已绑定" if self.birth_data.get("manager_umo") else "❌未绑定"
         status = "开启" if self.birth_data.get("notify_enable") else "关闭"
         msg = (
             f"📩生日通知配置\n"
@@ -298,14 +338,12 @@ class MyPlugin(Star):
         test_msg = "🧪【测试提醒】生日通知功能测试，这条是手动触发的消息，不是定时任务！"
         send_list = []
         try:
-            # ========== 重点修复：MessageEventResult 构建消息 ==========
             msg_result = MessageEventResult().plain(test_msg)
             if anchor_umo:
                 await self.context.send_message(anchor_umo, msg_result)
                 send_list.append("主播")
             if manager_umo:
                 await self.context.send_message(manager_umo, msg_result)
-                send_list.append("管理")
         except Exception as e:
             logger.error(f"发送测试通知异常: {e}")
             yield event.plain_result(f"⚠️ 消息发送出错：{str(e)}")
