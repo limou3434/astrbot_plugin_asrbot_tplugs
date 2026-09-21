@@ -401,7 +401,7 @@ class MyPlugin(Star):
         )
         yield event.plain_result(msg)
 
-    @filter.command("立刻通知")
+    @filter.command("测试发送")
     async def test_notify(self, event: AstrMessageEvent):
         anchor_umo = self.birth_data.get("anchor_umo", "")
         manager_umo = self.birth_data.get("manager_umo", "")
@@ -425,7 +425,7 @@ class MyPlugin(Star):
             logger.error(f"发送测试通知异常: {e}")
             yield event.plain_result(f"⚠️ 消息发送出错：{str(e)}")
             return
-        yield event.plain_result(f"✅ 测试消息已发送给：{','.join(send_list)}")
+        yield event.plain_result(f"✅ 测试消息已发送}")
 
     @filter.command("手动检查生日")
     async def manual_check_birthday(self, event: AstrMessageEvent):
