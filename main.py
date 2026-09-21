@@ -166,7 +166,7 @@ class MyPlugin(Star):
         raw_text = raw_text.replace("添加生日","").strip()
         parts = raw_text.split(":")
         if len(parts) != 4:
-            yield event.plain_result("❌ 参数格式错误！\n用法：添加生日 昵称:农历/国历:月份:日期\n例：添加生日 阿白:农历:8:15")
+            yield event.plain_result("❌ 参数格式错误！\n用法：添加生日 昵称:农历/国历:月份:日期\n例：添加生日 阿白:国历:8:15")
             return
         name, date_type, month_str, day_str = parts
         if date_type not in ("农历", "国历"):
@@ -238,25 +238,25 @@ class MyPlugin(Star):
 
     @filter.command("设置主播")
     async def set_anchor_qq(self, event: AstrMessageEvent):
-        raw_text = event.message_str.strip()
-        qq = raw_text.replace("设置主播","").strip()
-        if not qq.isdigit():
-            yield event.plain_result("❌ QQ号必须是纯数字！用法：设置主播 89876543")
+        # 只允许私聊执行，自动读取发送者QQ，不需要手动输入QQ号
+        if event.is_group:
+            yield event.plain_result("❌ 设置主播只能私聊机器人执行！")
             return
-        self.birth_data["anchor_qq"] = qq
+        sender_qq = str(event.get_sender_id())
+        self.birth_data["anchor_qq"] = sender_qq
         self.save_birth_data()
-        yield event.plain_result(f"✅ 主播QQ已设置为：{qq}\n👉 需要该QQ私聊bot发送【绑定主播】锁定通知会话")
+        yield event.plain_result(f"✅ 主播QQ已设置为你的账号：{sender_qq}\n👉 继续发送【绑定主播】锁定通知会话")
 
     @filter.command("设置管理")
     async def set_manager_qq(self, event: AstrMessageEvent):
-        raw_text = event.message_str.strip()
-        qq = raw_text.replace("设置管理","").strip()
-        if not qq.isdigit():
-            yield event.plain_result("❌ QQ号必须是纯数字！用法：设置管理 12345678")
+        # 只允许私聊执行，自动读取发送者QQ，不需要手动输入QQ号
+        if event.is_group:
+            yield event.plain_result("❌ 设置管理只能私聊机器人执行！")
             return
-        self.birth_data["manager_qq"] = qq
+        sender_qq = str(event.get_sender_id())
+        self.birth_data["manager_qq"] = sender_qq
         self.save_birth_data()
-        yield event.plain_result(f"✅ 管理QQ已设置为：{qq}\n👉 需要该QQ私聊bot发送【绑定管理】锁定通知会话")
+        yield event.plain_result(f"✅ 管理QQ已设置为你的账号：{sender_qq}\n👉 继续发送【绑定管理】锁定通知会话")
 
     @filter.command("绑定主播")
     async def bind_anchor(self, event: AstrMessageEvent):
@@ -266,7 +266,7 @@ class MyPlugin(Star):
             yield event.plain_result("❌ 主播占位已被占用！需要当前绑定者发送【解绑主播】释放占位后才能绑定")
             return
         if anchor_qq == "":
-            yield event.plain_result("❌ 尚未设置主播QQ！先发送【设置主播 QQ号】")
+            yield event.plain_result("❌ 尚未设置主播QQ！先私聊发送【设置主播】")
             return
         if sender_qq != anchor_qq:
             yield event.plain_result(f"❌ 权限拒绝！预设主播QQ是 {anchor_qq}，你不是该账号，无法绑定主播")
@@ -283,7 +283,7 @@ class MyPlugin(Star):
             yield event.plain_result("❌ 管理占位已被占用！需要当前绑定者发送【解绑管理】释放占位后才能绑定")
             return
         if manager_qq == "":
-            yield event.plain_result("❌ 尚未设置管理QQ！先发送【设置管理 QQ号】")
+            yield event.plain_result("❌ 尚未设置管理QQ！先私聊发送【设置管理】")
             return
         if sender_qq != manager_qq:
             yield event.plain_result(f"❌ 权限拒绝！预设管理QQ是 {manager_qq}，你不是该账号，无法绑定管理")
