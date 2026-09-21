@@ -1,35 +1,74 @@
 {
-  "token": {
-    "description": "tokentoken",
-    "type": "string",
-    "secret": true
-  },
-  "sub_config": {
-    "description": "测试嵌套配置",
+  "zbly_cjpz": {
+    "description": "直播留言 - 插件配置",
     "type": "object",
-    "hint": "xxxx",
     "items": {
-      "name": {
-        "description": "namename",
+      "enable": {
+        "description": "直播留言功能开关",
+        "type": "template_list",
+        "default": "true",
+        "items": [
+          {
+            "label": "启用",
+            "value": "true"
+          },
+          {
+            "label": "禁用",
+            "value": "false"
+          }
+        ],
+        "hint": "关闭后 /留言 指令不会发送B站弹幕"
+      },
+      "roomID": {
+        "description": "bilibili 主播房间号 id",
+        "type": "number"
+      },
+      "maxCharCnt": {
+        "description": "发送留言的最大字数（请不要超过 35 个字符）",
+        "type": "number",
+        "default": 35
+      },
+      "sessdata": {
+        "description": "cookie 字段",
         "type": "string",
-        "hint": "xxxx"
+        "secret": true
       },
-      "id": {
-        "description": "idid",
-        "type": "int",
-        "hint": "xxxx"
+      "biliJct": {
+        "description": "cookie 字段",
+        "type": "string",
+        "secret": true
       },
-      "time": {
-        "description": "timetime",
-        "type": "int",
-        "hint": "xxxx",
-        "default": 123
+      "buvid3": {
+        "description": "cookie 字段",
+        "type": "string",
+        "secret": true
       },
-      "passwd": {
-        "description": "passwdpasswd",
-        "type": "int",
-        "hint": "xxxx",
-        "default": 123
+      "bNut": {
+        "description": "cookie 字段",
+        "type": "string",
+        "secret": true
+      }
+    }
+  },
+  "srtx_cjpz": {
+    "description": "生日提醒 - 插件配置",
+    "type": "object",
+    "items": {
+      "enable": {
+        "description": "直播留言功能开关",
+        "type": "template_list",
+        "default": "true",
+        "items": [
+          {
+            "label": "启用",
+            "value": "true"
+          },
+          {
+            "label": "禁用",
+            "value": "false"
+          }
+        ],
+        "hint": "关闭后 /留言 指令不会发送B站弹幕"
       }
     }
   }
