@@ -70,12 +70,12 @@ class MyPlugin(Star):
             try:
                 anchor_umo = self.birth_data.get("anchor_umo", "")
                 manager_umo = self.birth_data.get("manager_umo", "")
-                msg_result = MessageEventResult().plain(msg_text)
+                # 直接传字符串，移除MessageEventResult
                 if anchor_umo != "":
-                    await self.context.send_message(anchor_umo, msg_result)
+                    await self.context.send_message(anchor_umo, msg_text)
                     logger.info(f"生日提醒发送给主播会话: {msg_text}")
                 if manager_umo != "":
-                    await self.context.send_message(manager_umo, msg_result)
+                    await self.context.send_message(manager_umo, msg_text)
                     logger.info(f"生日提醒发送给管理会话: {msg_text}")
             except Exception as e:
                 logger.error(f"定时生日通知发送失败: {e}")
@@ -327,12 +327,12 @@ class MyPlugin(Star):
         test_msg = "🧪【测试提醒】生日通知功能测试，这条是手动触发的消息，不是定时任务！"
         send_list = []
         try:
-            msg_result = MessageEventResult().plain(test_msg)
+            # 直接传字符串，删掉 MessageEventResult
             if anchor_umo != "":
-                await self.context.send_message(anchor_umo, msg_result)
+                await self.context.send_message(anchor_umo, test_msg)
                 send_list.append("主播")
             if manager_umo != "":
-                await self.context.send_message(manager_umo, msg_result)
+                await self.context.send_message(manager_umo, test_msg)
                 send_list.append("管理")
         except Exception as e:
             logger.error(f"发送测试通知异常: {e}")
