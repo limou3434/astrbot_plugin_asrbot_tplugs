@@ -10,7 +10,7 @@ from datetime import datetime
 from zhdate import ZhDate
 import asyncio
 
-@register("bilibili_danmaku", "limou3434", "梦寝兔兔专用群聊插件", "1.1.1")
+@register("bilibili_danmaku", "limou3434", "梦寝兔兔专用群聊插件", "1.1.2")
 class MyPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
@@ -74,12 +74,13 @@ class MyPlugin(Star):
             except Exception as e:
                 logger.warning(f"生日解析异常 {item}：{e}")
 
-        logger.info(f"生日定时检查完成，匹配到今日生日名单：{birthday_names}")
+        logger.info(f"【生日检查】生日定时检查完成，匹配到今日生日名单：{birthday_names}")
         if not birthday_names:
-            logger.info("今日无生日，不发送通知")
+            logger.info("【生日检查】今日无生日，不发送通知")
             return
 
         msg_text = f"🎂 今日生日提醒！\n{','.join(birthday_names)} 今天过生日！"
+        logger.info(f"【生日检查】准备发送消息内容：{msg_text}")
         try:
             anchor_umo = self.birth_data.get("anchor_umo", "")
             manager_umo = self.birth_data.get("manager_umo", "")
@@ -87,12 +88,16 @@ class MyPlugin(Star):
             # 主播、管理 两个都发
             if anchor_umo != "":
                 await self.context.send_message(anchor_umo, msg_chain)
-                logger.info(f"生日提醒发送给主播会话: {msg_text}")
+                logger.info(f"【生日检查】生日提醒发送给主播会话成功")
+            else:
+                logger.warning("【生日检查】主播umo为空，跳过主播")
             if manager_umo != "":
                 await self.context.send_message(manager_umo, msg_chain)
-                logger.info(f"生日提醒发送给管理会话: {msg_text}")
+                logger.info(f"【生日检查】生日提醒发送给管理会话成功")
+            else:
+                logger.warning("【生日检查】管理umo为空，跳过管理")
         except Exception as e:
-            logger.error(f"定时生日通知发送失败: {e}")
+            logger.error(f"【生日检查】定时生日通知发送失败: {e}")
 
     async def birth_loop(self):
         while True:
@@ -107,13 +112,14 @@ class MyPlugin(Star):
                 # 如果当前时间已经超过目标时间，则目标改为明天同一时刻
                 if now > target:
                     target = target.replace(day=now.day + 1)
+                    logger.info(f"【生日循环】当前时间已超过今日目标，自动切换到明天 {target.strftime('%Y-%m-%d %H:%M:%S')}")
                 sleep_sec = (target - now).total_seconds()
-                logger.info(f"生日定时任务等待 {sleep_sec:.1f}s 后执行，目标时间：{target.strftime('%Y-%m-%d %H:%M:%S')}")
+                logger.info(f"【生日循环】生日定时任务等待 {sleep_sec:.1f}s 后执行，目标时间：{target.strftime('%Y-%m-%d %H:%M:%S')}")
                 await asyncio.sleep(sleep_sec)
                 # 到点执行生日检查
                 await self.daily_birthday_check()
             except Exception as e:
-                logger.error(f"生日定时循环异常，10秒后重试: {e}")
+                logger.error(f"【生日循环】生日定时循环异常，10秒后重试: {e}")
                 await asyncio.sleep(10)
 
     @filter.command("你好")
@@ -385,6 +391,12 @@ class MyPlugin(Star):
             yield event.plain_result(f"⚠️ 消息发送出错：{str(e)}")
             return
         yield event.plain_result(f"✅ 测试消息已发送给：{','.join(send_list)}")
+
+    # ========== 新增调试指令 ==========
+    @filter.command("手动检查生日")
+    async def manual_check_birthday(self, event: AstrMessageEvent):
+        yield event.plain_result("🔍 开始执行生日扫描+发送逻辑，请查看日志！")
+        await self.daily_birthday_check()
 
     async def terminate(self):
         if self.birth_task:
