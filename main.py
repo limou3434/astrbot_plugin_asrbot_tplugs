@@ -55,7 +55,7 @@ class MyPlugin(Star):
         birthday_names = []
         for item in self.birth_data["birthday_list"]:
             try:
-                if item["type"] == "日历":
+                if item["type"] == "国历":
                     if today.month == item["month"] and today.day == item["day"]:
                         birthday_names.append(item["name"])
                 else:
@@ -161,16 +161,16 @@ class MyPlugin(Star):
 
     @filter.command("添加生日")
     async def record_birthday(self, event: AstrMessageEvent):
-        """用法：添加生日 昵称:农历/日历:月份:日期"""
+        """用法：添加生日 昵称:农历/国历:月份:日期"""
         raw_text = event.message_str.strip()
         raw_text = raw_text.replace("添加生日","").strip()
         parts = raw_text.split(":")
         if len(parts) != 4:
-            yield event.plain_result("❌ 参数格式错误！\n用法：添加生日 昵称:农历/日历:月份:日期\n例：添加生日 阿白:农历:8:15")
+            yield event.plain_result("❌ 参数格式错误！\n用法：添加生日 昵称:农历/国历:月份:日期\n例：添加生日 阿白:农历:8:15")
             return
         name, date_type, month_str, day_str = parts
-        if date_type not in ("农历", "日历"):
-            yield event.plain_result("❌ 第二个参数只能填写：农历 或者 日历")
+        if date_type not in ("农历", "国历"):
+            yield event.plain_result("❌ 第二个参数只能填写：农历 或者 国历")
             return
         try:
             month = int(month_str)
@@ -179,7 +179,7 @@ class MyPlugin(Star):
             yield event.plain_result("❌ 月份、日期必须是纯数字！")
             return
         try:
-            if date_type == "日历":
+            if date_type == "国历":
                 datetime(2024, month, day)
             else:
                 ZhDate(2024, month, day).to_datetime()
