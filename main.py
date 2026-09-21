@@ -238,8 +238,8 @@ class MyPlugin(Star):
 
     @filter.command("设置主播")
     async def set_anchor_qq(self, event: AstrMessageEvent):
-        # 私聊发送，一步设置QQ + 绑定当前私聊会话，不再需要单独绑定指令
-        if event.is_group:
+        # 改用 is_private 判断私聊，修复旧适配器不存在 is_group 的报错
+        if not event.is_private:
             yield event.plain_result("❌ 设置主播只能私聊机器人执行！")
             return
         sender_qq = str(event.get_sender_id())
@@ -250,8 +250,7 @@ class MyPlugin(Star):
 
     @filter.command("设置管理")
     async def set_manager_qq(self, event: AstrMessageEvent):
-        # 私聊发送，一步设置QQ + 绑定当前私聊会话
-        if event.is_group:
+        if not event.is_private:
             yield event.plain_result("❌ 设置管理只能私聊机器人执行！")
             return
         sender_qq = str(event.get_sender_id())
