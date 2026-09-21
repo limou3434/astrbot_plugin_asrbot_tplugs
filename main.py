@@ -1,4 +1,4 @@
-from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
+from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult, MessageChain
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 from astrbot.api.message_components import Plain
@@ -71,11 +71,13 @@ class MyPlugin(Star):
             try:
                 anchor_umo = self.birth_data.get("anchor_umo", "")
                 manager_umo = self.birth_data.get("manager_umo", "")
+                # 构建MessageChain对象！！重点
+                chain = MessageChain([Plain(msg_text)])
                 if anchor_umo:
-                    await self.context.send_message(anchor_umo, [Plain(msg_text)])
+                    await self.context.send_message(anchor_umo, chain)
                     logger.info(f"生日提醒发送给主播会话: {msg_text}")
                 if manager_umo:
-                    await self.context.send_message(manager_umo, [Plain(msg_text)])
+                    await self.context.send_message(manager_umo, chain)
                     logger.info(f"生日提醒发送给管理会话: {msg_text}")
             except Exception as e:
                 logger.error(f"定时生日通知发送失败: {e}")
@@ -290,11 +292,13 @@ class MyPlugin(Star):
         test_msg = "🧪【测试提醒】生日通知功能测试，这条是手动触发的消息，不是定时任务！"
         send_list = []
         try:
+            # 构建MessageChain对象
+            chain = MessageChain([Plain(test_msg)])
             if anchor_umo:
-                await self.context.send_message(anchor_umo, [Plain(test_msg)])
+                await self.context.send_message(anchor_umo, chain)
                 send_list.append("主播")
             if manager_umo:
-                await self.context.send_message(manager_umo, [Plain(test_msg)])
+                await self.context.send_message(manager_umo, chain)
                 send_list.append("管理")
         except Exception as e:
             logger.error(f"发送测试通知异常: {e}")
