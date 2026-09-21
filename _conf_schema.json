@@ -21,11 +21,11 @@
       },
       "roomID": {
         "description": "bilibili 主播房间号 id",
-        "type": "number"
+        "type": "int"
       },
       "maxCharCnt": {
         "description": "发送留言的最大字数（请不要超过 35 个字符）",
-        "type": "number",
+        "type": "int",
         "default": 35
       },
       "sessdata": {
