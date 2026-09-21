@@ -1,8 +1,9 @@
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
-# 新增导入Plain消息组件
 from astrbot.api.message_components import Plain
+# 重点：导入MessageChain
+from astrbot.api.event import MessageChain
 import aiohttp
 import json
 import os
@@ -72,12 +73,13 @@ class MyPlugin(Star):
             try:
                 anchor_umo = self.birth_data.get("anchor_umo", "")
                 manager_umo = self.birth_data.get("manager_umo", "")
-                # 包装成 [Plain()] 组件列表
+                # ==========核心修改：构造MessageChain对象==========
+                msg_chain = MessageChain().message(msg_text)
                 if anchor_umo != "":
-                    await self.context.send_message(anchor_umo, [Plain(msg_text)])
+                    await self.context.send_message(anchor_umo, msg_chain)
                     logger.info(f"生日提醒发送给主播会话: {msg_text}")
                 if manager_umo != "":
-                    await self.context.send_message(manager_umo, [Plain(msg_text)])
+                    await self.context.send_message(manager_umo, msg_chain)
                     logger.info(f"生日提醒发送给管理会话: {msg_text}")
             except Exception as e:
                 logger.error(f"定时生日通知发送失败: {e}")
@@ -329,12 +331,12 @@ class MyPlugin(Star):
         test_msg = "🧪【测试提醒】生日通知功能测试，这条是手动触发的消息，不是定时任务！"
         send_list = []
         try:
-            # 重点：包装 Plain 组件列表
+            msg_chain = MessageChain().message(test_msg)
             if anchor_umo != "":
-                await self.context.send_message(anchor_umo, [Plain(test_msg)])
+                await self.context.send_message(anchor_umo, msg_chain)
                 send_list.append("主播")
             if manager_umo != "":
-                await self.context.send_message(manager_umo, [Plain(test_msg)])
+                await self.context.send_message(manager_umo, msg_chain)
                 send_list.append("管理")
         except Exception as e:
             logger.error(f"发送测试通知异常: {e}")
