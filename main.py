@@ -1,7 +1,6 @@
-from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult, MessageChain
+from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
-from astrbot.api.message_components import Plain
 import aiohttp
 import json
 import os
@@ -71,13 +70,13 @@ class MyPlugin(Star):
             try:
                 anchor_umo = self.birth_data.get("anchor_umo", "")
                 manager_umo = self.birth_data.get("manager_umo", "")
-                # 构建MessageChain对象！！重点
-                chain = MessageChain([Plain(msg_text)])
+                # ========== 重点修复：用MessageEventResult.plain，不再使用MessageChain和Plain组件 ==========
+                msg_result = MessageEventResult().plain(msg_text)
                 if anchor_umo:
-                    await self.context.send_message(anchor_umo, chain)
+                    await self.context.send_message(anchor_umo, msg_result)
                     logger.info(f"生日提醒发送给主播会话: {msg_text}")
                 if manager_umo:
-                    await self.context.send_message(manager_umo, chain)
+                    await self.context.send_message(manager_umo, msg_result)
                     logger.info(f"生日提醒发送给管理会话: {msg_text}")
             except Exception as e:
                 logger.error(f"定时生日通知发送失败: {e}")
@@ -145,13 +144,28 @@ class MyPlugin(Star):
         except Exception as e:
             yield event.plain_result(f"❌ 未知错误：{str(e)}")
 
-    @filter.command("生日记录")
+    @filter.command("是否通知")
+    async def toggle_birth_notify(self, event: AstrMessageEvent, msg: str = ""):
+        """/是否通知 开 / /是否通知 关"""
+        arg = msg.strip()
+        if arg == "开":
+            self.birth_data["notify_enable"] = True
+            self.save_birth_data()
+            yield event.plain_result("✅ 生日提醒已开启，生日当天会私聊主播和管理")
+        elif arg == "关":
+            self.birth_data["notify_enable"] = False
+            self.save_birth_data()
+            yield event.plain_result("✅ 生日提醒已关闭")
+        else:
+            yield event.plain_result("❌ 参数只能是【开】或者【关】\n用法：/是否通知 开")
+
+    @filter.command("添加生日")
     async def record_birthday(self, event: AstrMessageEvent):
-        """/生日记录 昵称:农历/日历:月份:日期"""
+        """/添加生日 昵称:农历/日历:月份:日期"""
         raw_text = event.message_str.strip()
         parts = raw_text.split(":")
         if len(parts) != 4:
-            yield event.plain_result("❌ 参数格式错误！\n用法：/生日记录 昵称:农历/日历:月份:日期\n例：/生日记录 阿白:农历:8:15")
+            yield event.plain_result("❌ 参数格式错误！\n用法：/添加生日 昵称:农历/日历:月份:日期\n例：/添加生日 阿白:农历:8:15")
             return
         name, date_type, month_str, day_str = parts
         if date_type not in ("农历", "日历"):
@@ -189,20 +203,27 @@ class MyPlugin(Star):
         self.save_birth_data()
         yield event.plain_result(f"✅ 生日记录成功！\n{name}｜{date_type} {month}月{day}日")
 
-    @filter.command("生日通知")
-    async def toggle_birth_notify(self, event: AstrMessageEvent, msg: str = ""):
-        """/生日通知 开 / /生日通知 关"""
-        arg = msg.strip()
-        if arg == "开":
-            self.birth_data["notify_enable"] = True
+    @filter.command("移除生日")
+    async def remove_birthday(self, event: AstrMessageEvent, msg: str = ""):
+        """/移除生日 昵称，删除对应人的生日记录"""
+        target_name = msg.strip()
+        if not target_name:
+            yield event.plain_result("❌ 需要填写昵称，用法：/移除生日 阿白")
+            return
+        old_len = len(self.birth_data["birthday_list"])
+        self.birth_data["birthday_list"] = [item for item in self.birth_data["birthday_list"] if item["name"] != target_name]
+        if len(self.birth_data["birthday_list"]) < old_len:
             self.save_birth_data()
-            yield event.plain_result("✅ 生日提醒已开启，生日当天会私聊主播和管理")
-        elif arg == "关":
-            self.birth_data["notify_enable"] = False
-            self.save_birth_data()
-            yield event.plain_result("✅ 生日提醒已关闭")
+            yield event.plain_result(f"✅ 已移除【{target_name}】的生日记录")
         else:
-            yield event.plain_result("❌ 参数只能是【开】或者【关】\n用法：/生日通知 开")
+            yield event.plain_result(f"❌ 找不到【{target_name}】的生日记录")
+
+    @filter.command("清理生日")
+    async def clear_all_birth(self, event: AstrMessageEvent):
+        """/清理生日 清空全部生日记录"""
+        self.birth_data["birthday_list"] = []
+        self.save_birth_data()
+        yield event.plain_result("✅ 所有生日记录已清空！")
 
     @filter.command("生日列表")
     async def show_birth_list(self, event: AstrMessageEvent):
@@ -215,21 +236,6 @@ class MyPlugin(Star):
         for item in lst:
             msg += f"{item['name']} | {item['type']} {item['month']}月{item['day']}日\n"
         yield event.plain_result(msg)
-
-    @filter.command("生日移除")
-    async def remove_birthday(self, event: AstrMessageEvent, msg: str = ""):
-        """/生日移除 昵称，删除对应人的生日记录"""
-        target_name = msg.strip()
-        if not target_name:
-            yield event.plain_result("❌ 需要填写昵称，用法：/生日移除 阿白")
-            return
-        old_len = len(self.birth_data["birthday_list"])
-        self.birth_data["birthday_list"] = [item for item in self.birth_data["birthday_list"] if item["name"] != target_name]
-        if len(self.birth_data["birthday_list"]) < old_len:
-            self.save_birth_data()
-            yield event.plain_result(f"✅ 已移除【{target_name}】的生日记录")
-        else:
-            yield event.plain_result(f"❌ 找不到【{target_name}】的生日记录")
 
     @filter.command("设置主播")
     async def set_anchor_qq(self, event: AstrMessageEvent, msg: str = ""):
@@ -284,7 +290,7 @@ class MyPlugin(Star):
         manager_umo = self.birth_data.get("manager_umo", "")
         notify_enable = self.birth_data.get("notify_enable", False)
         if not notify_enable:
-            yield event.plain_result("❌ 当前生日通知总开关是关闭状态，无法发送测试消息，请先 /生日通知 开")
+            yield event.plain_result("❌ 当前生日通知总开关是关闭状态，无法发送测试消息，请先 /是否通知 开")
             return
         if not anchor_umo and not manager_umo:
             yield event.plain_result("❌ 主播、管理会话都未绑定，请主播/管理私聊机器人执行 /绑定主播 /绑定管理")
@@ -292,13 +298,13 @@ class MyPlugin(Star):
         test_msg = "🧪【测试提醒】生日通知功能测试，这条是手动触发的消息，不是定时任务！"
         send_list = []
         try:
-            # 构建MessageChain对象
-            chain = MessageChain([Plain(test_msg)])
+            # ========== 重点修复：MessageEventResult 构建消息 ==========
+            msg_result = MessageEventResult().plain(test_msg)
             if anchor_umo:
-                await self.context.send_message(anchor_umo, chain)
+                await self.context.send_message(anchor_umo, msg_result)
                 send_list.append("主播")
             if manager_umo:
-                await self.context.send_message(manager_umo, chain)
+                await self.context.send_message(manager_umo, msg_result)
                 send_list.append("管理")
         except Exception as e:
             logger.error(f"发送测试通知异常: {e}")

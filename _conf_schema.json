@@ -9,7 +9,7 @@
         "default": "true",
         "options": ["true", "false"],
         "labels": ["启用", "禁用"],
-        "hint": "关闭后 /留言 指令不会发送B站弹幕"
+        "hint": "关闭后直播留言功能将被禁用"
       },
       "roomID": {
         "description": "bilibili 主播房间号 id",
@@ -21,24 +21,28 @@
         "default": 35
       },
       "sessdata": {
-        "description": "cookie 字段",
+        "description": "cookie 字段 - sessdata",
         "type": "string",
-        "secret": true
+        "secret": true,
+        "hint": "请使用任意 bilibili 账号登陆网页版后在浏览器中获取"
       },
       "biliJct": {
-        "description": "cookie 字段",
+        "description": "cookie 字段 - biliJct",
         "type": "string",
-        "secret": true
+        "secret": true,
+        "hint": "请使用任意 bilibili 账号登陆网页版后在浏览器中获取"
       },
       "buvid3": {
-        "description": "cookie 字段",
+        "description": "cookie 字段 - buvid3",
         "type": "string",
-        "secret": true
+        "secret": true,
+        "hint": "请使用任意 bilibili 账号登陆网页版后在浏览器中获取"
       },
       "bNut": {
-        "description": "cookie 字段",
+        "description": "cookie 字段 - bNut",
         "type": "string",
-        "secret": true
+        "secret": true,
+        "hint": "请使用任意 bilibili 账号登陆网页版后在浏览器中获取"
       }
     }
   },
@@ -52,7 +56,7 @@
         "default": "true",
         "options": ["true", "false"],
         "labels": ["启用", "禁用"],
-        "hint": "关闭后生日定时检测、/立刻通知 都不生效"
+        "hint": "关闭后生日提醒功能将被禁用"
       }
     }
   }
