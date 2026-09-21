@@ -238,24 +238,26 @@ class MyPlugin(Star):
 
     @filter.command("设置主播")
     async def set_anchor_qq(self, event: AstrMessageEvent):
-        # 改用 is_private 判断私聊，修复旧适配器不存在 is_group 的报错
-        if not event.is_private:
+        # 改用 unified_msg_origin 判断私聊，不再使用 is_private / is_group
+        umo = event.unified_msg_origin
+        if umo.startswith("group:"):
             yield event.plain_result("❌ 设置主播只能私聊机器人执行！")
             return
         sender_qq = str(event.get_sender_id())
         self.birth_data["anchor_qq"] = sender_qq
-        self.birth_data["anchor_umo"] = event.unified_msg_origin
+        self.birth_data["anchor_umo"] = umo
         self.save_birth_data()
         yield event.plain_result(f"✅ 主播设置完成！QQ：{sender_qq}，当前私聊会话已作为生日通知接收会话。")
 
     @filter.command("设置管理")
     async def set_manager_qq(self, event: AstrMessageEvent):
-        if not event.is_private:
+        umo = event.unified_msg_origin
+        if umo.startswith("group:"):
             yield event.plain_result("❌ 设置管理只能私聊机器人执行！")
             return
         sender_qq = str(event.get_sender_id())
         self.birth_data["manager_qq"] = sender_qq
-        self.birth_data["manager_umo"] = event.unified_msg_origin
+        self.birth_data["manager_umo"] = umo
         self.save_birth_data()
         yield event.plain_result(f"✅ 管理设置完成！QQ：{sender_qq}，当前私聊会话已作为生日通知接收会话。")
 
@@ -331,6 +333,7 @@ class MyPlugin(Star):
                 send_list.append("主播")
             if manager_umo != "":
                 await self.context.send_message(manager_umo, msg_result)
+                send_list.append("管理")
         except Exception as e:
             logger.error(f"发送测试通知异常: {e}")
             yield event.plain_result(f"⚠️ 消息发送出错：{str(e)}")
