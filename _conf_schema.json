@@ -1,0 +1,36 @@
+{
+  "token": {
+    "description": "tokentoken",
+    "type": "string",
+    "secret": true
+  },
+  "sub_config": {
+    "description": "测试嵌套配置",
+    "type": "object",
+    "hint": "xxxx",
+    "items": {
+      "name": {
+        "description": "namename",
+        "type": "string",
+        "hint": "xxxx"
+      },
+      "id": {
+        "description": "idid",
+        "type": "int",
+        "hint": "xxxx"
+      },
+      "time": {
+        "description": "timetime",
+        "type": "int",
+        "hint": "xxxx",
+        "default": 123
+      },
+      "passwd": {
+        "description": "passwdpasswd",
+        "type": "int",
+        "hint": "xxxx",
+        "default": 123
+      }
+    }
+  }
+}

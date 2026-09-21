@@ -8,11 +8,7 @@ from datetime import datetime
 from zhdate import ZhDate
 import asyncio
 
-def count_rune(s: str) -> int:
-    """等价Go utf8.RuneCountInString，统计Unicode字符数"""
-    return len(list(s))
-
-@register("bilibili_danmaku", "limou3434", "梦寝兔兔专用群聊插件：QQ留言转B站弹幕 + 生日定时私聊提醒", "1.0.0")
+@register("bilibili_danmaku", "limou3434", "梦寝兔兔专用群聊插件", "1.0.0")
 class MyPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
@@ -23,6 +19,10 @@ class MyPlugin(Star):
         os.makedirs(self.data_dir, exist_ok=True)
         self.birth_data = self.load_birth_data()
         self.birth_task = None
+
+    def count_rune(self, s: str) -> int:
+        """等价Go utf8.RuneCountInString，统计Unicode字符数"""
+        return len(list(s))
 
     def load_birth_data(self):
         if os.path.exists(self.data_path):
@@ -39,25 +39,64 @@ class MyPlugin(Star):
             "manager_umo": "",
             "birthday_list": []
         }
-    
+
     def save_birth_data(self):
-        with open(self.data_path, "w", encoding="utf-8") as f:
-            json.dump(self.birth_data, f, ensure_ascii=False, indent=2)
-    
+        try:
+            with open(self.data_path, "w", encoding="utf-8") as f:
+                json.dump(self.birth_data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.error(f"生日数据保存失败: {e}")
+
     async def initialize(self):
         self.birth_task = asyncio.create_task(self.birth_loop())
-    
+
+    async def daily_birthday_check(self):
+        today = datetime.now()
+        birthday_names = []
+        for item in self.birth_data["birthday_list"]:
+            try:
+                if item["type"] == "日历":
+                    if today.month == item["month"] and today.day == item["day"]:
+                        birthday_names.append(item["name"])
+                else:
+                    lunar_birth = ZhDate(today.year, item["month"], item["day"])
+                    solar_birth = lunar_birth.to_datetime()
+                    if solar_birth.month == today.month and solar_birth.day == today.day:
+                        birthday_names.append(item["name"])
+            except Exception as e:
+                logger.warning(f"生日解析异常 {item}：{e}")
+        if birthday_names:
+            msg_text = f"🎂 今日生日提醒！\n{','.join(birthday_names)} 今天过生日！"
+            try:
+                anchor_umo = self.birth_data.get("anchor_umo", "")
+                manager_umo = self.birth_data.get("manager_umo", "")
+                if anchor_umo:
+                    await self.context.send_message(anchor_umo, msg_text)
+                    logger.info(f"生日提醒发送给主播会话: {msg_text}")
+                if manager_umo:
+                    await self.context.send_message(manager_umo, msg_text)
+                    logger.info(f"生日提醒发送给管理会话: {msg_text}")
+            except Exception as e:
+                logger.error(f"定时生日通知发送失败: {e}")
+
     async def birth_loop(self):
-        # 每日早上8点执行生日检查
+        # 每日早上8点执行生日检查，增加异常保护，崩溃自动续跑
         while True:
-            now = datetime.now()
-            next_run = datetime(now.year, now.month, now.day, 8, 0, 0)
-            if now >= next_run:
-                next_run = next_run.replace(day=now.day + 1)
-            sleep_sec = (next_run - now).total_seconds()
-            await asyncio.sleep(sleep_sec)
-            await self.daily_birthday_check()
-    
+            try:
+                now = datetime.now()
+                target = datetime(now.year, now.month, now.day, 8, 0, 0)
+                # 如果已经过了今天8点，目标设置为明天8点
+                if now > target:
+                    target = target.replace(day=now.day + 1)
+                sleep_sec = (target - now).total_seconds()
+                logger.info(f"生日定时任务等待 {sleep_sec:.1f}s 后执行")
+                await asyncio.sleep(sleep_sec)
+                # 到点先执行检查
+                await self.daily_birthday_check()
+            except Exception as e:
+                logger.error(f"生日定时循环异常，10秒后重试: {e}")
+                await asyncio.sleep(10)
+
     @filter.command("你好")
     async def helloworld(self, event: AstrMessageEvent):
         user_name = event.get_sender_name()
@@ -65,7 +104,7 @@ class MyPlugin(Star):
         message_chain = event.get_messages()
         logger.info(message_chain)
         yield event.plain_result(f"Hello, {user_name}, 你发了 {message_str}!")
-    
+
     @filter.command("留言")
     async def send(self, event: AstrMessageEvent, msg: str = ""):
         """指令：/留言 内容"""
@@ -75,7 +114,7 @@ class MyPlugin(Star):
             return
         short_name = user_name[:5]
         full_danmaku = f"【{short_name}】留言：{msg.strip()}"
-        rune_cnt = count_rune(full_danmaku)
+        rune_cnt = self.count_rune(full_danmaku)
         if rune_cnt > self.max_danmaku_len:
             yield event.plain_result(
                 f"❌ 留言过长！\n完整弹幕预览：{full_danmaku}\n最大允许{self.max_danmaku_len}字符，当前{rune_cnt}字符"
@@ -102,7 +141,7 @@ class MyPlugin(Star):
             yield event.plain_result("❌ 请求超时，Go 服务响应超时")
         except Exception as e:
             yield event.plain_result(f"❌ 未知错误：{str(e)}")
-    
+
     @filter.command("生日记录")
     async def record_birthday(self, event: AstrMessageEvent):
         """/生日记录 昵称:农历/日历:月份:日期"""
@@ -123,9 +162,9 @@ class MyPlugin(Star):
             return
         try:
             if date_type == "日历":
-                datetime(2025, month, day)
+                datetime(2024, month, day)
             else:
-                ZhDate(2025, month, day).to_datetime()
+                ZhDate(2024, month, day).to_datetime()
         except Exception:
             yield event.plain_result("❌ 生日日期不合法，请重新输入！")
             return
@@ -241,71 +280,28 @@ class MyPlugin(Star):
         anchor_umo = self.birth_data.get("anchor_umo", "")
         manager_umo = self.birth_data.get("manager_umo", "")
         notify_enable = self.birth_data.get("notify_enable", False)
-
         if not notify_enable:
             yield event.plain_result("❌ 当前生日通知总开关是关闭状态，无法发送测试消息，请先 /生日通知 开")
             return
         if not anchor_umo and not manager_umo:
             yield event.plain_result("❌ 主播、管理会话都未绑定，请主播/管理私聊机器人执行 /绑定主播 /绑定管理")
             return
-        
+
         test_msg = "🧪【测试提醒】生日通知功能测试，这条是手动触发的消息，不是定时任务！"
         send_list = []
         try:
             if anchor_umo:
-                res = MessageEventResult()
-                res.plain(test_msg)
-                await self.context.send_message(anchor_umo, res)
+                await self.context.send_message(anchor_umo, test_msg)
                 send_list.append("主播")
             if manager_umo:
-                res = MessageEventResult()
-                res.plain(test_msg)
-                await self.context.send_message(manager_umo, res)
+                await self.context.send_message(manager_umo, test_msg)
                 send_list.append("管理")
         except Exception as e:
             logger.error(f"发送测试通知异常: {e}")
             yield event.plain_result(f"⚠️ 消息发送出错：{str(e)}")
             return
-        
-        yield event.plain_result(f"✅ 测试消息已发送给：{','.join(send_list)}")
 
-    async def daily_birthday_check(self):
-        if not self.birth_data["notify_enable"]:
-            return
-        anchor_umo = self.birth_data.get("anchor_umo", "")
-        manager_umo = self.birth_data.get("manager_umo", "")
-        if not anchor_umo and not manager_umo:
-            logger.warning("主播和管理会话都未绑定，无法发送生日提醒，请使用 /绑定主播 /绑定管理")
-            return
-        today = datetime.now()
-        birthday_names = []
-        for item in self.birth_data["birthday_list"]:
-            try:
-                if item["type"] == "日历":
-                    if today.month == item["month"] and today.day == item["day"]:
-                        birthday_names.append(item["name"])
-                else:
-                    lunar_birth = ZhDate(today.year, item["month"], item["day"])
-                    solar_birth = lunar_birth.to_datetime()
-                    if solar_birth.month == today.month and solar_birth.day == today.day:
-                        birthday_names.append(item["name"])
-            except Exception as e:
-                logger.warning(f"生日解析异常 {item}：{e}")
-        if birthday_names:
-            msg_text = f"🎂 今日生日提醒！\n{','.join(birthday_names)} 今天过生日！"
-            try:
-                if anchor_umo:
-                    res = MessageEventResult()
-                    res.plain(msg_text)
-                    await self.context.send_message(anchor_umo, res)
-                    logger.info(f"生日提醒发送给主播会话: {msg_text}")
-                if manager_umo:
-                    res = MessageEventResult()
-                    res.plain(msg_text)
-                    await self.context.send_message(manager_umo, res)
-                    logger.info(f"生日提醒发送给管理会话: {msg_text}")
-            except Exception as e:
-                logger.error(f"定时生日通知发送失败: {e}")
+        yield event.plain_result(f"✅ 测试消息已发送给：{','.join(send_list)}")
 
     async def terminate(self):
         if self.birth_task:
@@ -314,3 +310,5 @@ class MyPlugin(Star):
                 await self.birth_task
             except asyncio.CancelledError:
                 logger.info("生日定时任务已取消")
+        # 退出前保存数据
+        self.save_birth_data()
