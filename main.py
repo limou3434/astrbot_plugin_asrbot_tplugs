@@ -213,10 +213,10 @@ class MyPlugin(Star):
     @filter.command("设置时间")
     async def set_notify_time(self, event: AstrMessageEvent):
         raw_text = event.message_str.strip()
-        arg = raw_text.replace("设置提醒时间","").strip()
+        arg = raw_text.replace("设置时间","").strip()
         parts = arg.split(":")
         if len(parts) != 3:
-            yield event.plain_result("❌ 参数格式错误！\n格式：设置提醒时间 时:分:秒\n例：设置提醒时间 9:30:0")
+            yield event.plain_result("❌ 参数格式错误！\n格式：设置时间 时:分:秒\n例：设置时间 15:38:00")
             return
         try:
             h = int(parts[0])
@@ -253,7 +253,7 @@ class MyPlugin(Star):
             yield event.plain_result(f"✅ 已移除【{target_name}】的生日记录")
         else:
             yield event.plain_result(f"❌ 找不到【{target_name}】的生日记录")
-   
+    
     @filter.command("清理生日")
     async def clear_all_birth(self, event: AstrMessageEvent):
         self.birth_data["birthday_list"] = []
@@ -295,7 +295,7 @@ class MyPlugin(Star):
         self.birth_data["manager_umo"] = umo
         self.save_birth_data()
         yield event.plain_result(f"✅ 管理设置完成！QQ：{sender_qq}，当前私聊会话已作为生日通知接收会话。")
-   
+    
     @filter.command("解绑主播")
     async def unbind_anchor(self, event: AstrMessageEvent):
         sender_qq = str(event.get_sender_id())
@@ -348,7 +348,7 @@ class MyPlugin(Star):
             f"管理 QQ：{manager_qq} | {manager_bind}"
         )
         yield event.plain_result(msg)
-   
+    
     @filter.command("立刻通知")
     async def test_notify(self, event: AstrMessageEvent):
         anchor_umo = self.birth_data.get("anchor_umo", "")
