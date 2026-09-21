@@ -10,7 +10,7 @@ from datetime import datetime
 from zhdate import ZhDate
 import asyncio
 
-@register("bilibili_danmaku", "limou3434", "梦寝兔兔专用群聊插件", "1.1.2")
+@register("bilibili_danmaku", "limou3434", "梦寝兔兔专用群聊插件", "1.1.3")
 class MyPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
@@ -50,13 +50,24 @@ class MyPlugin(Star):
         except Exception as e:
             logger.error(f"生日数据保存失败: {e}")
 
-    async def initialize(self):
+    async def restart_birth_task(self):
+        """重启生日定时任务，读取最新配置"""
+        if self.birth_task:
+            self.birth_task.cancel()
+            try:
+                await self.birth_task
+            except asyncio.CancelledError:
+                logger.info("【生日循环】旧定时任务已取消")
         self.birth_task = asyncio.create_task(self.birth_loop())
+        logger.info("【生日循环】生日定时任务已重新启动，加载最新提醒时间")
+
+    async def initialize(self):
+        await self.restart_birth_task()
 
     async def daily_birthday_check(self):
         # 总开关判断
         if not self.birth_data.get("notify_enable", False):
-            logger.info("生日通知总开关关闭，跳过本次定时提醒")
+            logger.info("【生日检查】生日通知总开关关闭，跳过本次定时提醒")
             return
 
         today = datetime.now()
@@ -72,7 +83,7 @@ class MyPlugin(Star):
                     if lunar_today.month == item["month"] and lunar_today.day == item["day"]:
                         birthday_names.append(item["name"])
             except Exception as e:
-                logger.warning(f"生日解析异常 {item}：{e}")
+                logger.warning(f"【生日检查】生日解析异常 {item}：{e}")
 
         logger.info(f"【生日检查】生日定时检查完成，匹配到今日生日名单：{birthday_names}")
         if not birthday_names:
@@ -85,7 +96,7 @@ class MyPlugin(Star):
             anchor_umo = self.birth_data.get("anchor_umo", "")
             manager_umo = self.birth_data.get("manager_umo", "")
             msg_chain = MessageChain([Plain(msg_text)])
-            # 主播、管理 两个都发
+            # 主播、管理两个会话全部发送
             if anchor_umo != "":
                 await self.context.send_message(anchor_umo, msg_chain)
                 logger.info(f"【生日检查】生日提醒发送给主播会话成功")
@@ -109,14 +120,14 @@ class MyPlugin(Star):
                 mi = int(m_str)
                 sec = int(s_str)
                 target = datetime(now.year, now.month, now.day, h, mi, sec)
-                # 如果当前时间已经超过目标时间，则目标改为明天同一时刻
+                # 当前时间超过目标时间，自动切到明天同一时刻
                 if now > target:
                     target = target.replace(day=now.day + 1)
                     logger.info(f"【生日循环】当前时间已超过今日目标，自动切换到明天 {target.strftime('%Y-%m-%d %H:%M:%S')}")
                 sleep_sec = (target - now).total_seconds()
                 logger.info(f"【生日循环】生日定时任务等待 {sleep_sec:.1f}s 后执行，目标时间：{target.strftime('%Y-%m-%d %H:%M:%S')}")
                 await asyncio.sleep(sleep_sec)
-                # 到点执行生日检查
+                # 到点执行生日检索+通知
                 await self.daily_birthday_check()
             except Exception as e:
                 logger.error(f"【生日循环】生日定时循环异常，10秒后重试: {e}")
@@ -255,7 +266,9 @@ class MyPlugin(Star):
             return
         self.birth_data["notify_time"] = f"{h}:{m}:{s}"
         self.save_birth_data()
-        yield event.plain_result(f"✅ 生日提醒定时时间已设置为：{h}时{m}分{s}秒")
+        # ✅ 修改时间后，自动重启定时任务加载新时间！
+        await self.restart_birth_task()
+        yield event.plain_result(f"✅ 生日提醒定时时间已设置为：{h}时{m}分{s}秒，定时任务已自动重启生效！")
 
     @filter.command("移除生日")
     async def remove_birthday(self, event: AstrMessageEvent):
@@ -392,7 +405,6 @@ class MyPlugin(Star):
             return
         yield event.plain_result(f"✅ 测试消息已发送给：{','.join(send_list)}")
 
-    # ========== 新增调试指令 ==========
     @filter.command("手动检查生日")
     async def manual_check_birthday(self, event: AstrMessageEvent):
         yield event.plain_result("🔍 开始执行生日扫描+发送逻辑，请查看日志！")
