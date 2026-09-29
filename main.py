@@ -14,7 +14,7 @@ import asyncio
 class MyPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
-        self.api_endpoint = "http://172.18.168.211:8023/send_danmaku"
+        self.api_endpoint = "http://172.18.168.21:8023/send_danmaku" # 迟早优化
         self.max_danmaku_len = 35
         self.data_dir = os.path.join("data", "bilibili_danmaku")
         self.data_path = os.path.join(self.data_dir, "birthday_data.json")
