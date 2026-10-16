@@ -227,6 +227,39 @@ class MyPlugin(Star):
         else:
             yield event.plain_result("❌ 参数只能是【开】或者【关】\n用法：是否通知 开")
 
+    @filter.command("设置定时")
+    async def set_week_time(self, event: AstrMessageEvent):
+        """
+        示例：设置周定时 19:30,19:30,19:30,14:30,14:30,14:30,null
+        顺序：周一,周二,周三,周四,周五,周六,周日
+        null代表当天不提醒
+        """
+        raw_text = event.message_str.strip()
+        arg = raw_text.replace("设置定时","").strip()
+        parts = [p.strip() for p in arg.split(",")]
+        if len(parts) != 7:
+            yield event.plain_result("❌ 必须7个值（周一到周日，逗号隔开）\n例：设置定时 19:30,19:30,19:30,14:30,14:30,14:30,null")
+            return
+        for p in parts:
+            if self.parse_time_str(p) is None and p.lower() != "null":
+                yield event.plain_result(f"❌ 无效时间：{p}，只能 HH:MM 或者 null")
+                return
+        self.birth_data["notify_week"] = parts
+        self.save_birth_data()
+        await self.restart_birth_task()
+        yield event.plain_result(f"✅ 每周定时已保存并重启任务：\n周一:{parts[0]} 周二:{parts[1]} 周三:{parts[2]}\n周四:{parts[3]} 周五:{parts[4]} 周六:{parts[5]}\n周日:{parts[6]}")
+
+    @filter.command("生日列表")
+    async def show_birth_list(self, event: AstrMessageEvent):
+        lst = self.birth_data["birthday_list"]
+        if not lst:
+            yield event.plain_result("📭 暂无登记的生日记录")
+            return
+        msg = "📋 已登记生日列表：\n"
+        for item in lst:
+            msg += f"{item['name']} | 国历 {item['month']}月{item['day']}日\n"
+        yield event.plain_result(msg)
+
     @filter.command("添加生日")
     async def record_birthday(self, event: AstrMessageEvent):
         """用法：添加生日 昵称:月份:日期"""
@@ -265,28 +298,6 @@ class MyPlugin(Star):
         self.save_birth_data()
         yield event.plain_result(f"✅ 生日记录成功！\n{name}｜国历 {month}月{day}日")
 
-    @filter.command("设置定时")
-    async def set_week_time(self, event: AstrMessageEvent):
-        """
-        示例：设置周定时 19:30,19:30,19:30,14:30,14:30,14:30,null
-        顺序：周一,周二,周三,周四,周五,周六,周日
-        null代表当天不提醒
-        """
-        raw_text = event.message_str.strip()
-        arg = raw_text.replace("设置定时","").strip()
-        parts = [p.strip() for p in arg.split(",")]
-        if len(parts) != 7:
-            yield event.plain_result("❌ 必须7个值（周一到周日，逗号隔开）\n例：设置定时 19:30,19:30,19:30,14:30,14:30,14:30,null")
-            return
-        for p in parts:
-            if self.parse_time_str(p) is None and p.lower() != "null":
-                yield event.plain_result(f"❌ 无效时间：{p}，只能 HH:MM 或者 null")
-                return
-        self.birth_data["notify_week"] = parts
-        self.save_birth_data()
-        await self.restart_birth_task()
-        yield event.plain_result(f"✅ 每周定时已保存并重启任务：\n周一:{parts[0]} 周二:{parts[1]} 周三:{parts[2]}\n周四:{parts[3]} 周五:{parts[4]} 周六:{parts[5]}\n周日:{parts[6]}")
-
     @filter.command("移除生日")
     async def remove_birthday(self, event: AstrMessageEvent):
         raw_text = event.message_str.strip()
@@ -308,15 +319,30 @@ class MyPlugin(Star):
         self.save_birth_data()
         yield event.plain_result("✅ 所有生日记录已清空！")
 
-    @filter.command("生日列表")
-    async def show_birth_list(self, event: AstrMessageEvent):
-        lst = self.birth_data["birthday_list"]
-        if not lst:
-            yield event.plain_result("📭 暂无登记的生日记录")
-            return
-        msg = "📋 已登记生日列表：\n"
-        for item in lst:
-            msg += f"{item['name']} | 国历 {item['month']}月{item['day']}日\n"
+    @filter.command("查看接收")
+    async def show_notify_target(self, event: AstrMessageEvent):
+        anchor_qq = self.birth_data.get("anchor_qq", "未设置")
+        manager_qq = self.birth_data.get("manager_qq", "未设置")
+        week_cfg = self.birth_data.get("notify_week", ["8:00"]*7)
+        week_name = ["周一","周二","周三","周四","周五","周六","周日"]
+        time_text = "\n".join([f"{week_name[i]}：{week_cfg[i]}" for i in range(7)])
+
+        if self.birth_data.get("anchor_umo","") != "":
+            anchor_bind = "✅已绑定"
+        else:
+            anchor_bind = "❌未绑定"
+        if self.birth_data.get("manager_umo","") != "":
+            manager_bind = "✅已绑定"
+        else:
+            manager_bind = "❌未绑定"
+        status = "开启" if self.birth_data.get("notify_enable") else "关闭"
+        msg = (
+            f"📩生日通知配置\n"
+            f"通知状态：{status}\n"
+            f"⏰每周定时（null=不提醒）：\n{time_text}\n"
+            f"主播 QQ：{anchor_qq} | {anchor_bind}\n"
+            f"管理 QQ：{manager_qq} | {manager_bind}"
+        )
         yield event.plain_result(msg)
 
     @filter.command("设置主播")
@@ -372,32 +398,6 @@ class MyPlugin(Star):
         self.birth_data["manager_qq"] = ""
         self.save_birth_data()
         yield event.plain_result("✅ 管理配置已全部清空，可以重新设置。")
-
-    @filter.command("查看接收")
-    async def show_notify_target(self, event: AstrMessageEvent):
-        anchor_qq = self.birth_data.get("anchor_qq", "未设置")
-        manager_qq = self.birth_data.get("manager_qq", "未设置")
-        week_cfg = self.birth_data.get("notify_week", ["8:00"]*7)
-        week_name = ["周一","周二","周三","周四","周五","周六","周日"]
-        time_text = "\n".join([f"{week_name[i]}：{week_cfg[i]}" for i in range(7)])
-
-        if self.birth_data.get("anchor_umo","") != "":
-            anchor_bind = "✅已绑定"
-        else:
-            anchor_bind = "❌未绑定"
-        if self.birth_data.get("manager_umo","") != "":
-            manager_bind = "✅已绑定"
-        else:
-            manager_bind = "❌未绑定"
-        status = "开启" if self.birth_data.get("notify_enable") else "关闭"
-        msg = (
-            f"📩生日通知配置\n"
-            f"通知状态：{status}\n"
-            f"⏰每周定时（null=不提醒）：\n{time_text}\n"
-            f"主播 QQ：{anchor_qq} | {anchor_bind}\n"
-            f"管理 QQ：{manager_qq} | {manager_bind}"
-        )
-        yield event.plain_result(msg)
 
     @filter.command("测试通知")
     async def test_notify(self, event: AstrMessageEvent):
